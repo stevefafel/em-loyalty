@@ -27,9 +27,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
-import { Eye, CheckCircle, XCircle, Undo2 } from "lucide-react";
+import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2 } from "lucide-react";
+import type { InvoiceExtraction } from "@/types/database";
 
 interface InvoiceWithRelations {
   id: string;
@@ -41,6 +43,7 @@ interface InvoiceWithRelations {
   created_at: string;
   users: { name: string };
   shops: { name: string };
+  extraction_status: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -59,6 +62,8 @@ export default function AdminInvoicesPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [actionLoading, setActionLoading] = useState<"approve" | "reject" | null>(null);
+  const [extractionData, setExtractionData] = useState<InvoiceExtraction | null>(null);
+  const [extractionLoading, setExtractionLoading] = useState(false);
 
   const fetchInvoices = useCallback(async () => {
     const res = await fetch("/api/invoices");
@@ -74,17 +79,30 @@ export default function AdminInvoicesPage() {
   const openReview = async (inv: InvoiceWithRelations) => {
     setReviewTarget(inv);
     setPreviewUrl(null);
+    setExtractionData(null);
     setLoadingPreview(true);
+    setExtractionLoading(true);
 
-    const { url } = await getSignedInvoiceUrl(inv.file_path);
-    setPreviewUrl(url || null);
+    const [signedUrl, detailRes] = await Promise.all([
+      getSignedInvoiceUrl(inv.file_path),
+      fetch(`/api/invoices/${inv.id}`),
+    ]);
+
+    setPreviewUrl(signedUrl.url || null);
     setLoadingPreview(false);
+
+    if (detailRes.ok) {
+      const { data } = await detailRes.json();
+      setExtractionData(data.extraction || null);
+    }
+    setExtractionLoading(false);
   };
 
   const closeReview = () => {
     setReviewTarget(null);
     setPreviewUrl(null);
     setActionLoading(null);
+    setExtractionData(null);
   };
 
   const handleApprove = async () => {
@@ -172,7 +190,7 @@ export default function AdminInvoicesPage() {
                 {pendingInvoices.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell>
-                      {new Date(inv.created_at).toLocaleDateString()}
+                      {new Date(inv.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell>{inv.shops?.name || "—"}</TableCell>
                     <TableCell>{inv.users?.name || "—"}</TableCell>
@@ -232,7 +250,7 @@ export default function AdminInvoicesPage() {
                 {approvedInvoices.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell>
-                      {new Date(inv.created_at).toLocaleDateString()}
+                      {new Date(inv.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell>{inv.shops?.name || "—"}</TableCell>
                     <TableCell>{inv.users?.name || "—"}</TableCell>
@@ -288,7 +306,7 @@ export default function AdminInvoicesPage() {
                 {rejectedInvoices.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell>
-                      {new Date(inv.created_at).toLocaleDateString()}
+                      {new Date(inv.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell>{inv.shops?.name || "—"}</TableCell>
                     <TableCell>{inv.users?.name || "—"}</TableCell>
@@ -324,7 +342,7 @@ export default function AdminInvoicesPage() {
 
       {/* Review Modal */}
       <Dialog open={!!reviewTarget} onOpenChange={(open) => { if (!open) closeReview(); }}>
-        <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-6xl h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Review Invoice</DialogTitle>
             <DialogDescription>
@@ -338,22 +356,183 @@ export default function AdminInvoicesPage() {
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0">
-            {loadingPreview ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Loading invoice...
-              </div>
-            ) : previewUrl ? (
-              <iframe
-                src={previewUrl}
-                className="w-full h-full rounded-md border"
-                title="Invoice preview"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Unable to load invoice preview.
-              </div>
-            )}
+          <div className="flex-1 min-h-0 flex gap-4">
+            {/* Left: Document preview */}
+            <div className="flex-1 min-h-0">
+              {loadingPreview ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Loading invoice...
+                </div>
+              ) : previewUrl ? (
+                <iframe
+                  src={previewUrl}
+                  className="w-full h-full rounded-md border"
+                  title="Invoice preview"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Unable to load invoice preview.
+                </div>
+              )}
+            </div>
+
+            {/* Right: AI-extracted data panel */}
+            <div className="w-80 shrink-0 overflow-y-auto border rounded-md p-4 space-y-4">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                AI-Extracted Data
+              </h3>
+              {extractionLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading...
+                </div>
+              ) : !extractionData ? (
+                <p className="text-sm text-muted-foreground">
+                  No extraction data available.
+                </p>
+              ) : extractionData.status === "processing" ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </div>
+              ) : extractionData.status === "failed" ? (
+                <div className="text-sm text-red-500 space-y-2">
+                  <div className="flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    Extraction failed
+                  </div>
+                  {extractionData.error_message && (
+                    <p className="text-xs text-muted-foreground">
+                      {extractionData.error_message}
+                    </p>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!reviewTarget) return;
+                      setExtractionLoading(true);
+                      setExtractionData(null);
+                      await fetch(`/api/invoices/${reviewTarget.id}/extract`, { method: "POST" });
+                      const detailRes = await fetch(`/api/invoices/${reviewTarget.id}`);
+                      if (detailRes.ok) {
+                        const { data } = await detailRes.json();
+                        setExtractionData(data.extraction || null);
+                      }
+                      setExtractionLoading(false);
+                    }}
+                  >
+                    Retry Extraction
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Vendor:</span>{" "}
+                      {extractionData.vendor_name || "N/A"}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Invoice #:</span>{" "}
+                      {extractionData.invoice_number || "N/A"}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Date:</span>{" "}
+                      {extractionData.invoice_date
+                        ? new Date(extractionData.invoice_date).toLocaleDateString()
+                        : "N/A"}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Subtotal:</span>{" "}
+                      {extractionData.subtotal != null
+                        ? formatCurrency(extractionData.subtotal)
+                        : "N/A"}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Tax:</span>{" "}
+                      {extractionData.tax_amount != null
+                        ? formatCurrency(extractionData.tax_amount)
+                        : "N/A"}
+                    </div>
+                    <div className="font-medium">
+                      <span className="text-muted-foreground">Total:</span>{" "}
+                      {extractionData.total_amount != null
+                        ? formatCurrency(extractionData.total_amount)
+                        : "N/A"}
+                    </div>
+                  </div>
+
+                  {/* Amount comparison */}
+                  {reviewTarget && extractionData.total_amount != null && (
+                    <div className="p-2 rounded bg-muted text-sm space-y-1">
+                      <div>
+                        <span className="text-muted-foreground">User submitted:</span>{" "}
+                        {formatCurrency(Number(reviewTarget.amount))}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">AI extracted:</span>{" "}
+                        {formatCurrency(extractionData.total_amount)}
+                      </div>
+                      {Math.abs(
+                        Number(reviewTarget.amount) - extractionData.total_amount
+                      ) > 0.01 && (
+                        <Badge
+                          variant="outline"
+                          className="border-yellow-500 text-yellow-700 mt-1"
+                        >
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Amount Mismatch
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Line items */}
+                  {extractionData.line_items &&
+                    extractionData.line_items.length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">
+                            Line Items ({extractionData.line_items.length})
+                          </h4>
+                          <div className="space-y-2">
+                            {extractionData.line_items.map((item) => (
+                              <div
+                                key={item.id}
+                                className="text-xs border rounded p-2 space-y-1"
+                              >
+                                <div className="font-medium">
+                                  {item.description}
+                                </div>
+                                <div className="flex justify-between text-muted-foreground">
+                                  <span>
+                                    {item.quantity != null
+                                      ? `Qty: ${item.quantity}`
+                                      : ""}
+                                    {item.quantity != null &&
+                                      item.unit_price != null &&
+                                      ` x ${formatCurrency(item.unit_price)}`}
+                                  </span>
+                                  <span className="font-medium text-foreground">
+                                    {formatCurrency(item.amount)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                </>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button

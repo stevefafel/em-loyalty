@@ -40,6 +40,14 @@ enum LedgerType {
   @@map("ledger_type")
 }
 
+enum ExtractionStatus {
+  processing
+  completed
+  failed
+
+  @@map("extraction_status")
+}
+
 // ── Models ─────────────────────────────────────────────
 
 model Shop {
@@ -103,13 +111,51 @@ model Invoice {
   created_at DateTime      @default(now()) @db.Timestamptz()
   updated_at DateTime      @default(now()) @db.Timestamptz()
 
-  shop           Shop            @relation(fields: [shop_id], references: [id], onDelete: Cascade)
-  user           User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop           Shop                @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   loyalty_ledger LoyaltyLedger[]
+  extraction     InvoiceExtraction?
 
   @@index([shop_id])
   @@index([status])
   @@map("invoices")
+}
+
+model InvoiceExtraction {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id     String           @unique @db.Uuid
+  status         ExtractionStatus @default(processing)
+  vendor_name    String?
+  invoice_number String?
+  invoice_date   DateTime?        @db.Date
+  subtotal       Decimal?         @db.Decimal(10, 2)
+  tax_amount     Decimal?         @db.Decimal(10, 2)
+  total_amount   Decimal?         @db.Decimal(10, 2)
+  currency       String?          @default("USD")
+  raw_response   Json?
+  error_message  String?
+  created_at     DateTime         @default(now()) @db.Timestamptz()
+  updated_at     DateTime         @default(now()) @db.Timestamptz()
+
+  invoice    Invoice           @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  line_items InvoiceLineItem[]
+
+  @@map("invoice_extractions")
+}
+
+model InvoiceLineItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extraction_id String   @db.Uuid
+  description   String
+  quantity      Decimal? @db.Decimal(10, 3)
+  unit_price    Decimal? @db.Decimal(10, 2)
+  amount        Decimal  @db.Decimal(10, 2)
+  sort_order    Int      @default(0)
+
+  extraction InvoiceExtraction @relation(fields: [extraction_id], references: [id], onDelete: Cascade)
+
+  @@index([extraction_id])
+  @@map("invoice_line_items")
 }
 
 model TrainingModule {

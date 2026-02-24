@@ -80,6 +80,12 @@ export default function EnrollmentPage() {
       return;
     }
 
+    // Trigger AI extraction (fire-and-forget)
+    const { data: newInvoice } = await res.json();
+    if (newInvoice?.id) {
+      fetch(`/api/invoices/${newInvoice.id}/extract`, { method: "POST" });
+    }
+
     router.refresh();
   };
 

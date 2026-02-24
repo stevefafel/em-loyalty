@@ -82,6 +82,36 @@ export interface CollateralLogEntry {
   downloaded_at: string;
 }
 
+export type ExtractionStatus = "processing" | "completed" | "failed";
+
+export interface InvoiceExtraction {
+  id: string;
+  invoice_id: string;
+  status: ExtractionStatus;
+  vendor_name: string | null;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  subtotal: number | null;
+  tax_amount: number | null;
+  total_amount: number | null;
+  currency: string | null;
+  raw_response: unknown;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  line_items?: InvoiceLineItem[];
+}
+
+export interface InvoiceLineItem {
+  id: string;
+  extraction_id: string;
+  description: string;
+  quantity: number | null;
+  unit_price: number | null;
+  amount: number;
+  sort_order: number;
+}
+
 export interface LoyaltyLedgerEntry {
   id: string;
   shop_id: string;

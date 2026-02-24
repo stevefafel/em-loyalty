@@ -19,7 +19,11 @@ export async function GET(req: NextRequest) {
 
   const data = await prisma.invoice.findMany({
     where,
-    include: { user: { select: { name: true } }, shop: { select: { name: true } } },
+    include: {
+      user: { select: { name: true } },
+      shop: { select: { name: true } },
+      extraction: { select: { status: true } },
+    },
     orderBy: { created_at: "desc" },
   });
 
@@ -29,6 +33,7 @@ export async function GET(req: NextRequest) {
     amount: Number(inv.amount),
     users: { name: inv.user.name },
     shops: { name: inv.shop.name },
+    extraction_status: inv.extraction?.status || null,
   }));
 
   return NextResponse.json({ data: mapped });

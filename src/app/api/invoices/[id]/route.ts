@@ -18,6 +18,11 @@ export async function GET(
     include: {
       user: { select: { name: true } },
       shop: { select: { name: true } },
+      extraction: {
+        include: {
+          line_items: { orderBy: { sort_order: "asc" } },
+        },
+      },
     },
   });
 
