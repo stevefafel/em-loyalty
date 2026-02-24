@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum ProgramStatus {
+  new
+  pending
+  approved
+  rejected
+
+  @@map("program_status")
+}
+
+enum InvoiceStatus {
+  pending
+  approved
+  rejected
+
+  @@map("invoice_status")
+}
+
+enum UserRole {
+  admin
+  user
+
+  @@map("user_role")
+}
+
+enum LedgerType {
+  credit
+  debit
+
+  @@map("ledger_type")
+}
+
+// ── Models ─────────────────────────────────────────────
+
+model Shop {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String
+  address               String?
+  phone                 String?
+  program_status        ProgramStatus @default(new)
+  loyalty_points_balance Int          @default(0)
+  created_at            DateTime      @default(now()) @db.Timestamptz()
+  updated_at            DateTime      @default(now()) @db.Timestamptz()
+
+  user_shops      UserShop[]
+  invoices        Invoice[]
+  training_logs   TrainingLog[]
+  collateral_logs CollateralLog[]
+  loyalty_ledger  LoyaltyLedger[]
+
+  @@index([program_status])
+  @@map("shops")
+}
+
+model User {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String   @unique
+  name       String
+  phone      String?
+  role       UserRole @default(user)
+  created_at DateTime @default(now()) @db.Timestamptz()
+
+  user_shops      UserShop[]
+  invoices        Invoice[]
+  training_logs   TrainingLog[]
+  collateral_logs CollateralLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model UserShop {
+  user_id    String   @db.Uuid
+  shop_id    String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz()
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop Shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, shop_id])
+  @@index([shop_id])
+  @@map("user_shops")
+}
+
+model Invoice {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shop_id    String        @db.Uuid
+  user_id    String        @db.Uuid
+  file_path  String
+  amount     Decimal       @db.Decimal(10, 2)
+  status     InvoiceStatus @default(pending)
+  is_initial Boolean       @default(false)
+  created_at DateTime      @default(now()) @db.Timestamptz()
+  updated_at DateTime      @default(now()) @db.Timestamptz()
+
+  shop           Shop            @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  loyalty_ledger LoyaltyLedger[]
+
+  @@index([shop_id])
+  @@index([status])
+  @@map("invoices")
+}
+
+model TrainingModule {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  pdf_path    String
+  questions   Json     @default("[]")
+  created_at  DateTime @default(now()) @db.Timestamptz()
+
+  training_logs TrainingLog[]
+
+  @@map("training_modules")
+}
+
+model TrainingLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  shop_id      String   @db.Uuid
+  module_id    String   @db.Uuid
+  score        Int
+  completed_at DateTime @default(now()) @db.Timestamptz()
+
+  user   User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop   Shop           @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  module TrainingModule @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, shop_id])
+  @@index([module_id])
+  @@map("training_log")
+}
+
+model Collateral {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  file_path   String
+  category    String?
+  created_at  DateTime @default(now()) @db.Timestamptz()
+
+  collateral_logs CollateralLog[]
+
+  @@map("collateral")
+}
+
+model CollateralLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @db.Uuid
+  shop_id       String   @db.Uuid
+  collateral_id String   @db.Uuid
+  downloaded_at DateTime @default(now()) @db.Timestamptz()
+
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop       Shop       @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  collateral Collateral @relation(fields: [collateral_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, shop_id])
+  @@map("collateral_log")
+}
+
+model LoyaltyLedger {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shop_id      String     @db.Uuid
+  invoice_id   String?    @db.Uuid
+  points_delta Int
+  type         LedgerType
+  description  String?
+  created_at   DateTime   @default(now()) @db.Timestamptz()
+
+  shop    Shop     @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+
+  @@index([shop_id])
+  @@map("loyalty_ledger")
+}
