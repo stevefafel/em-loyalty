@@ -116,7 +116,7 @@ model TrainingModule {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
   description String?
-  pdf_path    String
+  pdf_path    String?
   questions   Json     @default("[]")
   created_at  DateTime @default(now()) @db.Timestamptz()
 

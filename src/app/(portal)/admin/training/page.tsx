@@ -37,7 +37,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, FileText, Eye } from "lucide-react";
+import { uploadTrainingPdf, getTrainingPdfUrl } from "@/lib/supabase/storage";
 import type { TrainingModule, QuizQuestion } from "@/types/database";
 
 const emptyQuestion: QuizQuestion = {
@@ -56,6 +57,9 @@ export default function AdminTrainingPage() {
   const [editingModule, setEditingModule] = useState<TrainingModule | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Preview dialog state
+  const [previewTarget, setPreviewTarget] = useState<TrainingModule | null>(null);
+
   // Delete dialog state
   const [deleteTarget, setDeleteTarget] = useState<TrainingModule | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -63,8 +67,9 @@ export default function AdminTrainingPage() {
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [pdfPath, setPdfPath] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [error, setError] = useState("");
 
   const fetchModules = useCallback(async () => {
     const res = await fetch("/api/training");
@@ -80,9 +85,10 @@ export default function AdminTrainingPage() {
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setPdfPath("");
+    setFile(null);
     setQuestions([]);
     setEditingModule(null);
+    setError("");
   };
 
   const openCreate = () => {
@@ -94,7 +100,7 @@ export default function AdminTrainingPage() {
     setEditingModule(mod);
     setTitle(mod.title);
     setDescription(mod.description || "");
-    setPdfPath(mod.pdf_path);
+    setFile(null);
     setQuestions(
       Array.isArray(mod.questions) && mod.questions.length > 0
         ? (mod.questions as QuizQuestion[])
@@ -105,12 +111,30 @@ export default function AdminTrainingPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    const payload = {
+    setError("");
+
+    let pdfPath: string | undefined;
+
+    // Upload file if one was selected
+    if (file) {
+      const { path, error: uploadError } = await uploadTrainingPdf(file);
+      if (uploadError) {
+        setError("Failed to upload file. Please try again.");
+        setSaving(false);
+        return;
+      }
+      pdfPath = path;
+    }
+
+    const payload: Record<string, unknown> = {
       title,
       description: description || undefined,
-      pdf_path: pdfPath,
       questions,
     };
+
+    if (pdfPath) {
+      payload.pdf_path = pdfPath;
+    }
 
     const url = editingModule
       ? `/api/training/${editingModule.id}`
@@ -127,6 +151,9 @@ export default function AdminTrainingPage() {
       setDialogOpen(false);
       resetForm();
       fetchModules();
+    } else {
+      const data = await res.json();
+      setError(data.error ? JSON.stringify(data.error) : "Failed to save.");
     }
     setSaving(false);
   };
@@ -203,7 +230,7 @@ export default function AdminTrainingPage() {
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>PDF Path</TableHead>
+                  <TableHead>Reference Material</TableHead>
                   <TableHead>Questions</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
@@ -216,8 +243,17 @@ export default function AdminTrainingPage() {
                     <TableCell className="max-w-[200px] truncate">
                       {mod.description || "—"}
                     </TableCell>
-                    <TableCell className="max-w-[150px] truncate text-sm text-muted-foreground">
-                      {mod.pdf_path}
+                    <TableCell>
+                      {mod.pdf_path ? (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span className="max-w-[120px] truncate">
+                            {mod.pdf_path.split("/").pop()}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
@@ -229,6 +265,16 @@ export default function AdminTrainingPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        {mod.pdf_path && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-exxon-blue hover:text-exxon-blue hover:bg-blue-50"
+                            onClick={() => setPreviewTarget(mod)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -291,14 +337,21 @@ export default function AdminTrainingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="pdfPath">PDF Path *</Label>
+              <Label htmlFor="file">Reference Material (PDF)</Label>
               <Input
-                id="pdfPath"
-                value={pdfPath}
-                onChange={(e) => setPdfPath(e.target.value)}
-                placeholder="e.g. training-pdfs/oil-change-101.pdf"
+                id="file"
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
               />
+              {editingModule?.pdf_path && !file && (
+                <p className="text-xs text-muted-foreground">
+                  Current file: {editingModule.pdf_path.split("/").pop()}
+                </p>
+              )}
             </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
 
             {/* Questions builder */}
             <div className="space-y-3">
@@ -375,10 +428,40 @@ export default function AdminTrainingPage() {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || !title || !pdfPath}
+              disabled={saving || !title}
               className="bg-exxon-red text-white hover:bg-exxon-red/90"
             >
               {saving ? "Saving..." : editingModule ? "Update Module" : "Create Module"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewTarget} onOpenChange={(open) => { if (!open) setPreviewTarget(null); }}>
+        <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{previewTarget?.title}</DialogTitle>
+            <DialogDescription>Reference Material</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {previewTarget?.pdf_path && (
+              <iframe
+                src={getTrainingPdfUrl(previewTarget.pdf_path)}
+                className="w-full h-full rounded-md border"
+                title={previewTarget.title}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" asChild>
+              <a
+                href={previewTarget?.pdf_path ? getTrainingPdfUrl(previewTarget.pdf_path) : "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open in New Tab
+              </a>
             </Button>
           </DialogFooter>
         </DialogContent>

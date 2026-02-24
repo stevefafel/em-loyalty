@@ -38,6 +38,21 @@ export async function getSignedInvoiceUrl(
   return { url: data.signedUrl, error: null };
 }
 
+export async function uploadTrainingPdf(
+  file: File
+): Promise<{ path: string; error: Error | null }> {
+  const supabase = createClient();
+  const timestamp = Date.now();
+  const storagePath = `modules/${timestamp}_${file.name}`;
+
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKETS.TRAINING_PDFS)
+    .upload(storagePath, file);
+
+  if (error) return { path: "", error };
+  return { path: storagePath, error: null };
+}
+
 export function getTrainingPdfUrl(filePath: string): string {
   const supabase = createClient();
   const { data } = supabase.storage

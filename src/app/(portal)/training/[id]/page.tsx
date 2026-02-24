@@ -22,7 +22,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, FileText, ExternalLink } from "lucide-react";
+import { getTrainingPdfUrl } from "@/lib/supabase/storage";
 import type { TrainingModule, TrainingLogEntry } from "@/types/database";
 
 export default function TrainingModulePage() {
@@ -90,6 +91,41 @@ export default function TrainingModulePage() {
         </h1>
         <p className="text-muted-foreground mt-1">{module.description}</p>
       </div>
+
+      {/* Reference Material */}
+      {module.pdf_path && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Reference Material
+            </CardTitle>
+            <CardDescription>
+              Review the reference material below before taking the quiz
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border overflow-hidden" style={{ height: "600px" }}>
+              <iframe
+                src={getTrainingPdfUrl(module.pdf_path)}
+                className="w-full h-full"
+                title={`${module.title} - Reference Material`}
+              />
+            </div>
+            <Button variant="outline" asChild>
+              <a
+                href={getTrainingPdfUrl(module.pdf_path)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in New Tab
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quiz */}
       <Card>

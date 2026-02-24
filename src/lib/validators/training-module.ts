@@ -9,13 +9,13 @@ const quizQuestionSchema = z.object({
 export const createTrainingModuleSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  pdf_path: z.string().min(1, "PDF path is required"),
+  pdf_path: z.string().optional().nullable(),
   questions: z.array(quizQuestionSchema).default([]),
 });
 
 export const updateTrainingModuleSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   description: z.string().optional().nullable(),
-  pdf_path: z.string().min(1, "PDF path is required").optional(),
+  pdf_path: z.string().optional().nullable(),
   questions: z.array(quizQuestionSchema).optional(),
 });

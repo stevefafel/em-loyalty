@@ -45,7 +45,7 @@ export interface TrainingModule {
   id: string;
   title: string;
   description: string | null;
-  pdf_path: string;
+  pdf_path: string | null;
   questions: QuizQuestion[];
   created_at: string;
 }
