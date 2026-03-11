@@ -32,7 +32,7 @@ export default function SwagShopPage() {
             Swag Shop
           </h1>
           <p className="text-muted-foreground mt-1">
-            Redeem your loyalty points for Mobil 1 merchandise
+            Redeem your premium growth points for Mobil 1 merchandise
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-exxon-red/10 px-4 py-2">

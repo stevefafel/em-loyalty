@@ -131,7 +131,7 @@ export default function InvoicesPage() {
             <DialogHeader>
               <DialogTitle>Upload New Invoice</DialogTitle>
               <DialogDescription>
-                Submit a Mobil 1 purchase invoice to earn loyalty points.
+                Submit a Mobil 1 purchase invoice to earn premium growth points.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleUpload} className="space-y-4">

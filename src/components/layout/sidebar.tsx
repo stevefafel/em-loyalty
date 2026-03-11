@@ -7,32 +7,29 @@ import { useShop } from "@/context/shop-context";
 import { PROGRAM_STATUS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
+  Home,
   FileText,
-  Award,
-  ShoppingBag,
+  Gift,
   GraduationCap,
   FileDown,
-  Megaphone,
-  Gift,
   ClipboardCheck,
   Store,
   Upload,
+  ExternalLink,
+  Handshake,
 } from "lucide-react";
 
 const shopUserLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/invoices", label: "Invoices", icon: FileText },
-  { href: "/points", label: "Points & Rewards", icon: Award },
-  { href: "/swag-shop", label: "Swag Shop", icon: ShoppingBag },
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/earn", label: "Earn & Track Points", icon: FileText },
+  { href: "/rewards", label: "Rewards", icon: Gift },
   { href: "/training", label: "Training", icon: GraduationCap },
   { href: "/collateral", label: "Marketing Materials", icon: FileDown },
-  { href: "/ads", label: "Ads & Partners", icon: Megaphone },
-  { href: "/perks", label: "Performance Perks", icon: Gift },
+  { href: "/partners", label: "Partners", icon: Handshake },
 ];
 
 const adminLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/admin/invoices", label: "Review Invoices", icon: ClipboardCheck },
   { href: "/admin/shops", label: "Manage Shops", icon: Store },
   { href: "/admin/training", label: "Training", icon: GraduationCap },
@@ -41,6 +38,11 @@ const adminLinks = [
 
 const enrollmentLinks = [
   { href: "/enrollment", label: "Enrollment", icon: Upload },
+];
+
+const partnerLinks = [
+  { label: "Log in to Steer", url: "https://app.steercrm.com", logo: "/partners/steer-logo.svg" },
+  { label: "Log in to AutoOps", url: "https://dashboard.autoops.com", logo: "/partners/autoops-logo.png" },
 ];
 
 export function Sidebar() {
@@ -62,14 +64,16 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-60 flex-col border-r border-gray-200 bg-white shrink-0">
-      <div className="flex h-14 items-center gap-3 border-b border-gray-200 px-5">
+      {/* Branding header — stacked M1 logo + program name */}
+      <div className="flex flex-col items-center gap-2 border-b border-gray-200 px-5 py-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mobil1-logo.svg" alt="Mobil 1" className="h-6" />
-        <div className="h-5 w-px bg-gray-300" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-exxon-gray">
-          Loyalty
+        <img src="/mobil1-logo-stacked.svg" alt="Mobil 1" className="h-20" />
+        <span className="text-sm font-bold uppercase tracking-wider text-exxon-charcoal">
+          Premium Growth
         </span>
       </div>
+
+      {/* Main navigation */}
       <nav className="flex-1 space-y-0.5 px-3 py-3">
         {links.map((link) => {
           const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
@@ -90,6 +94,34 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Partner login buttons + Pegasus footer */}
+      <div className="border-t border-gray-200 px-3 py-3 space-y-2">
+        {!isAdmin && isApproved && partnerLinks.map((partner) => (
+          <a
+            key={partner.label}
+            href={partner.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-exxon-charcoal/70 hover:bg-gray-50 hover:text-exxon-charcoal transition-colors"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={partner.logo} alt="" className="h-4 w-4 object-contain" />
+            <span className="flex-1">{partner.label}</span>
+            <ExternalLink className="h-3.5 w-3.5 opacity-50" />
+          </a>
+        ))}
+
+        {/* Pegasus logo */}
+        <div className="flex justify-center pt-2 pb-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/mobil-pegasus.svg"
+            alt="Mobil Pegasus"
+            className="h-8 opacity-30"
+          />
+        </div>
+      </div>
     </aside>
   );
 }

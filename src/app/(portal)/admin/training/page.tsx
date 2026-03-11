@@ -37,9 +37,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, X, FileText, Eye } from "lucide-react";
-import { uploadTrainingPdf, getTrainingPdfUrl } from "@/lib/supabase/storage";
-import type { TrainingModule, QuizQuestion } from "@/types/database";
+import { Plus, Pencil, Trash2, X, FileText, Eye, Package } from "lucide-react";
+import { uploadTrainingPdf, getTrainingPdfUrl, uploadScormPackage } from "@/lib/supabase/storage";
+import type { TrainingModule, QuizQuestion, TrainingContentType } from "@/types/database";
 
 const emptyQuestion: QuizQuestion = {
   question: "",
@@ -67,14 +67,18 @@ export default function AdminTrainingPage() {
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [contentType, setContentType] = useState<TrainingContentType>("pdf_quiz");
   const [file, setFile] = useState<File | null>(null);
+  const [scormFile, setScormFile] = useState<File | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [error, setError] = useState("");
 
   const fetchModules = useCallback(async () => {
     const res = await fetch("/api/training");
-    const { data } = await res.json();
-    setModules(data || []);
+    if (res.ok) {
+      const { data } = await res.json();
+      setModules(data || []);
+    }
     setIsLoading(false);
   }, []);
 
@@ -85,7 +89,9 @@ export default function AdminTrainingPage() {
   const resetForm = () => {
     setTitle("");
     setDescription("");
+    setContentType("pdf_quiz");
     setFile(null);
+    setScormFile(null);
     setQuestions([]);
     setEditingModule(null);
     setError("");
@@ -100,7 +106,9 @@ export default function AdminTrainingPage() {
     setEditingModule(mod);
     setTitle(mod.title);
     setDescription(mod.description || "");
+    setContentType(mod.content_type || "pdf_quiz");
     setFile(null);
+    setScormFile(null);
     setQuestions(
       Array.isArray(mod.questions) && mod.questions.length > 0
         ? (mod.questions as QuizQuestion[])
@@ -114,26 +122,42 @@ export default function AdminTrainingPage() {
     setError("");
 
     let pdfPath: string | undefined;
+    let scormPath: string | undefined;
 
-    // Upload file if one was selected
-    if (file) {
+    // Upload PDF if one was selected
+    if (file && contentType === "pdf_quiz") {
       const { path, error: uploadError } = await uploadTrainingPdf(file);
       if (uploadError) {
-        setError("Failed to upload file. Please try again.");
+        setError("Failed to upload PDF. Please try again.");
         setSaving(false);
         return;
       }
       pdfPath = path;
     }
 
+    // Upload SCORM package if one was selected
+    if (scormFile && contentType === "scorm") {
+      const { path, error: uploadError } = await uploadScormPackage(scormFile);
+      if (uploadError) {
+        setError("Failed to upload SCORM package. Please try again.");
+        setSaving(false);
+        return;
+      }
+      scormPath = path;
+    }
+
     const payload: Record<string, unknown> = {
       title,
       description: description || undefined,
-      questions,
+      content_type: contentType,
+      questions: contentType === "pdf_quiz" ? questions : [],
     };
 
     if (pdfPath) {
       payload.pdf_path = pdfPath;
+    }
+    if (scormPath) {
+      payload.scorm_path = scormPath;
     }
 
     const url = editingModule
@@ -229,8 +253,9 @@ export default function AdminTrainingPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Reference Material</TableHead>
+                  <TableHead>Content</TableHead>
                   <TableHead>Questions</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
@@ -240,11 +265,27 @@ export default function AdminTrainingPage() {
                 {modules.map((mod) => (
                   <TableRow key={mod.id}>
                     <TableCell className="font-medium">{mod.title}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        mod.content_type === "scorm"
+                          ? "border-exxon-blue text-exxon-blue"
+                          : ""
+                      }>
+                        {mod.content_type === "scorm" ? "SCORM" : "PDF + Quiz"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="max-w-[200px] truncate">
                       {mod.description || "—"}
                     </TableCell>
                     <TableCell>
-                      {mod.pdf_path ? (
+                      {mod.content_type === "scorm" && mod.scorm_path ? (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Package className="h-3.5 w-3.5" />
+                          <span className="max-w-[120px] truncate">
+                            {mod.scorm_path.split("/").pop()}
+                          </span>
+                        </div>
+                      ) : mod.pdf_path ? (
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <FileText className="h-3.5 w-3.5" />
                           <span className="max-w-[120px] truncate">
@@ -337,24 +378,62 @@ export default function AdminTrainingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="file">Reference Material (PDF)</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-              {editingModule?.pdf_path && !file && (
-                <p className="text-xs text-muted-foreground">
-                  Current file: {editingModule.pdf_path.split("/").pop()}
-                </p>
-              )}
+              <Label>Content Type</Label>
+              <Select
+                value={contentType}
+                onValueChange={(val) => setContentType(val as TrainingContentType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf_quiz">PDF + Quiz</SelectItem>
+                  <SelectItem value="scorm">SCORM Package</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {contentType === "pdf_quiz" && (
+              <div className="space-y-2">
+                <Label htmlFor="file">Reference Material (PDF)</Label>
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+                {editingModule?.pdf_path && !file && (
+                  <p className="text-xs text-muted-foreground">
+                    Current file: {editingModule.pdf_path.split("/").pop()}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {contentType === "scorm" && (
+              <div className="space-y-2">
+                <Label htmlFor="scorm-file">SCORM Package (.zip)</Label>
+                <Input
+                  id="scorm-file"
+                  type="file"
+                  accept=".zip"
+                  onChange={(e) => setScormFile(e.target.files?.[0] || null)}
+                />
+                {editingModule?.scorm_path && !scormFile && (
+                  <p className="text-xs text-muted-foreground">
+                    Current package: {editingModule.scorm_path.split("/").pop()}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Upload a SCORM 1.2 or 2004 compliant .zip package
+                </p>
+              </div>
+            )}
 
             {error && <p className="text-sm text-red-500">{error}</p>}
 
-            {/* Questions builder */}
-            <div className="space-y-3">
+            {/* Questions builder (pdf_quiz only) */}
+            {contentType === "pdf_quiz" && <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Quiz Questions ({questions.length})</Label>
                 <Button type="button" size="sm" variant="outline" onClick={addQuestion}>
@@ -419,7 +498,7 @@ export default function AdminTrainingPage() {
                   </div>
                 </Card>
               ))}
-            </div>
+            </div>}
           </div>
 
           <DialogFooter>

@@ -140,11 +140,11 @@ export default function EnrollmentPage() {
           <div className="flex justify-center mb-4">
             <Upload className="h-12 w-12 text-exxon-red" />
           </div>
-          <CardTitle className="text-2xl">Enroll in the Loyalty Program</CardTitle>
+          <CardTitle className="text-2xl">Enroll in the Premium Growth Program</CardTitle>
           <CardDescription>
             Submit an initial invoice of at least{" "}
             <strong>{formatCurrency(MIN_INITIAL_INVOICE)}</strong> to qualify
-            for the Mobil 1 Loyalty Program.
+            for the Mobil 1 Premium Growth Program.
           </CardDescription>
         </CardHeader>
         <CardContent>

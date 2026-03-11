@@ -31,8 +31,8 @@ const emprint = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Mobil 1 Loyalty Program",
-  description: "B2B Loyalty Program Portal for Auto Repair Shops",
+  title: "Mobil 1 Premium Growth Program",
+  description: "B2B Premium Growth Program Portal for Auto Repair Shops",
 };
 
 export default function RootLayout({

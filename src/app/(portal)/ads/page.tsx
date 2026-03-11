@@ -78,7 +78,7 @@ export default function AdsPage() {
         </h1>
         <p className="mt-2 text-muted-foreground">
           Exclusive tools and services from our partners to help grow your shop.
-          As a Mobil 1 Loyalty member, you get preferred access.
+          As a Mobil 1 Premium Growth member, you get preferred access.
         </p>
       </div>
 

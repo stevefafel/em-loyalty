@@ -83,3 +83,31 @@ export function getCollateralUrl(filePath: string): string {
     .getPublicUrl(filePath);
   return data.publicUrl;
 }
+
+export async function uploadScormPackage(
+  file: File
+): Promise<{ path: string; error: Error | null }> {
+  const supabase = createClient();
+  const timestamp = Date.now();
+  const storagePath = `packages/${timestamp}_${file.name}`;
+
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKETS.SCORM_PACKAGES)
+    .upload(storagePath, file);
+
+  if (error) return { path: "", error };
+  return { path: storagePath, error: null };
+}
+
+export async function getScormPackageUrl(
+  filePath: string,
+  expiresIn = 3600
+): Promise<{ url: string; error: Error | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKETS.SCORM_PACKAGES)
+    .createSignedUrl(filePath, expiresIn);
+
+  if (error || !data?.signedUrl) return { url: "", error: error || new Error("Failed to create signed URL") };
+  return { url: data.signedUrl, error: null };
+}

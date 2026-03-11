@@ -336,7 +336,7 @@ export default function ShopDetailsPage() {
                   <p className="text-4xl font-bold text-exxon-charcoal">
                     {shop.loyalty_points_balance}
                   </p>
-                  <p className="text-sm text-muted-foreground">loyalty points</p>
+                  <p className="text-sm text-muted-foreground">premium growth points</p>
                 </div>
               </div>
             </CardContent>

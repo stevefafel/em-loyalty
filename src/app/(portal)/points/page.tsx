@@ -59,7 +59,7 @@ export default function PointsPage() {
               <p className="text-4xl font-bold text-exxon-charcoal">
                 {activeShop?.loyalty_points_balance || 0}
               </p>
-              <p className="text-sm text-muted-foreground">loyalty points</p>
+              <p className="text-sm text-muted-foreground">premium growth points</p>
             </div>
           </div>
         </CardContent>

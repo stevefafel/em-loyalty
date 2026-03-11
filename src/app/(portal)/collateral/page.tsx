@@ -63,8 +63,25 @@ export default function CollateralPage() {
         Marketing Materials
       </h1>
       <p className="text-muted-foreground">
-        Download flyers, posters, and POS materials for your shop.
+        Download flyers, posters, and POS materials to promote Mobil 1 in your shop.
       </p>
+
+      {/* Branded callout */}
+      <Card className="border-exxon-blue/20 bg-gradient-to-r from-blue-50 to-white">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-exxon-blue/10">
+              <FileText className="h-5 w-5 text-exxon-blue" />
+            </div>
+            <div>
+              <p className="font-semibold text-exxon-charcoal">Premium Growth Marketing</p>
+              <p className="text-sm text-muted-foreground">
+                Use these materials to drive Mobil 1 awareness and boost your sales performance.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
@@ -104,6 +121,12 @@ export default function CollateralPage() {
           </div>
         ))
       )}
+
+      {/* M1 branding footer */}
+      <div className="flex justify-center pt-4 opacity-10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/mobil1-logo-stacked.svg" alt="" className="h-24" />
+      </div>
     </div>
   );
 }

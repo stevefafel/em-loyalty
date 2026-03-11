@@ -41,11 +41,15 @@ export interface Invoice {
   updated_at: string;
 }
 
+export type TrainingContentType = "pdf_quiz" | "scorm";
+
 export interface TrainingModule {
   id: string;
   title: string;
   description: string | null;
   pdf_path: string | null;
+  scorm_path: string | null;
+  content_type: TrainingContentType;
   questions: QuizQuestion[];
   created_at: string;
 }

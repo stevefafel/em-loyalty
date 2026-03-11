@@ -10,6 +10,8 @@ export const createTrainingModuleSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   pdf_path: z.string().optional().nullable(),
+  scorm_path: z.string().optional().nullable(),
+  content_type: z.enum(["pdf_quiz", "scorm"]).default("pdf_quiz"),
   questions: z.array(quizQuestionSchema).default([]),
 });
 
@@ -17,5 +19,7 @@ export const updateTrainingModuleSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   description: z.string().optional().nullable(),
   pdf_path: z.string().optional().nullable(),
+  scorm_path: z.string().optional().nullable(),
+  content_type: z.enum(["pdf_quiz", "scorm"]).optional(),
   questions: z.array(quizQuestionSchema).optional(),
 });

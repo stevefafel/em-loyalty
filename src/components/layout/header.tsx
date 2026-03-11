@@ -43,7 +43,7 @@ export function Header() {
         )}
         {isAdmin && !activeShop && (
           <h2 className="text-base font-semibold text-exxon-charcoal">
-            Admin Panel
+            Admin Access
           </h2>
         )}
       </div>

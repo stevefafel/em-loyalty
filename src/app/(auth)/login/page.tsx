@@ -26,8 +26,19 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-exxon-charcoal">
-      <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-2xl">
+    <div className="relative flex min-h-screen items-center justify-center bg-exxon-charcoal overflow-hidden">
+      {/* Red accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-exxon-red" />
+
+      {/* Background Pegasus watermark */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/mobil-pegasus.svg"
+        alt=""
+        className="absolute right-[-60px] bottom-[-60px] h-80 opacity-[0.04] pointer-events-none"
+      />
+
+      <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-2xl relative z-10">
         <div className="flex flex-col items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -36,13 +47,18 @@ export default async function LoginPage() {
             className="h-12"
           />
           <h1 className="text-2xl font-bold text-exxon-charcoal">
-            Loyalty Program Portal
+            Premium Growth Program
           </h1>
           <p className="text-sm text-exxon-gray">
             Select a user to sign in (POC mock auth)
           </p>
         </div>
         <LoginForm users={users || []} shopsByUser={shopsByUser} />
+        {/* Footer branding */}
+        <div className="flex justify-center pt-2 opacity-20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/mobil-pegasus.svg" alt="" className="h-6" />
+        </div>
       </div>
     </div>
   );
