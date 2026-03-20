@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient() {
   const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 5, // limit pool size for serverless
+    max: 2, // keep low for serverless + transaction mode pooler
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });

@@ -100,11 +100,6 @@ export default function TrainingPage() {
         </div>
       )}
 
-      {/* M1 branding footer */}
-      <div className="flex justify-center pt-4 opacity-10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mobil1-logo-stacked.svg" alt="" className="h-24" />
-      </div>
     </div>
   );
 }

@@ -13,19 +13,11 @@ import { ExternalLink } from "lucide-react";
 
 const partners = [
   {
-    name: "Steer CRM",
-    logo: "/partners/steer-logo.svg",
-    description:
-      "Manage bookings, reviews, marketing, and customer retention all in one place. As a Premium Growth member, you get an exclusive 20% discount.",
-    highlight: "20% off for Premium Growth members",
-    loginUrl: "https://app.steercrm.com",
-  },
-  {
     name: "AutoOps",
     logo: "/partners/autoops-logo.png",
     description:
-      "Streamline your shop operations with AutoOps. Track jobs, manage inventory, and optimize workflows to keep your business running smoothly.",
-    highlight: "Integrated shop management",
+      "The #1 online scheduling tool for auto shops. Fully customizable with 50+ settings — adjust branding, diagnostic questions, and more. Show live calendar availability and push appointments directly to your shop management system. Upsell declined work, get appointments through Google Search and Maps, recognize returning customers, and allow photo/video uploads. Works with all web hosts and marketing agencies.",
+    highlight: "#1 Online Scheduling Tool for Auto Shops",
     loginUrl: "https://dashboard.autoops.com",
   },
 ];
@@ -73,11 +65,6 @@ export default function PartnersPage() {
         ))}
       </div>
 
-      {/* M1 branding footer */}
-      <div className="flex justify-center pt-4 opacity-10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mobil1-logo-stacked.svg" alt="" className="h-24" />
-      </div>
     </div>
   );
 }

@@ -13,14 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Award, ShoppingBag, CreditCard, Percent } from "lucide-react";
+import { Award, ShoppingBag, CreditCard } from "lucide-react";
 import { SWAG_ITEMS } from "@/lib/swag-items";
 import { toast } from "sonner";
 
 const visaRewards = [
   {
-    id: "visa-25",
-    name: "$25 Visa Gift Card",
+    id: "visa-150",
+    name: "$150 Visa Gift Card",
     description: "Digital Visa gift card delivered via email within 24 hours.",
     pointsCost: 250,
   },
@@ -37,15 +37,6 @@ const visaRewards = [
     pointsCost: 900,
   },
 ];
-
-const steerDiscount = {
-  id: "steer-discount",
-  name: "Steer CRM — Premium Growth Discount",
-  description:
-    "As a Premium Growth member, get an exclusive discount on Steer CRM. Manage bookings, reviews, marketing, and customer retention all in one place.",
-  discount: "20% off",
-  url: "https://steer.io",
-};
 
 export default function RewardsPage() {
   const { activeShop } = useShop();
@@ -69,15 +60,11 @@ export default function RewardsPage() {
       <Tabs defaultValue="visa">
         <TabsList>
           <TabsTrigger value="visa">
-            <CreditCard className="h-4 w-4 mr-1" />
+            <CreditCard className="h-5 w-5 mr-1.5" />
             Visa Gift Cards
           </TabsTrigger>
-          <TabsTrigger value="partner">
-            <Percent className="h-4 w-4 mr-1" />
-            Partner Discounts
-          </TabsTrigger>
           <TabsTrigger value="swag">
-            <ShoppingBag className="h-4 w-4 mr-1" />
+            <ShoppingBag className="h-5 w-5 mr-1.5" />
             Swag Shop
           </TabsTrigger>
         </TabsList>
@@ -126,46 +113,6 @@ export default function RewardsPage() {
           </div>
         </TabsContent>
 
-        {/* Partner Discounts */}
-        <TabsContent value="partner">
-          <Card className="border-2 border-exxon-blue/20">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/partners/steer-logo.svg"
-                    alt="Steer"
-                    className="h-8 object-contain"
-                  />
-                  <div>
-                    <CardTitle>{steerDiscount.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      Exclusive for Premium Growth members
-                    </CardDescription>
-                  </div>
-                </div>
-                <Badge className="bg-green-100 text-green-700 border-green-300 text-lg px-3 py-1">
-                  {steerDiscount.discount}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {steerDiscount.description}
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="bg-exxon-blue text-white hover:bg-exxon-blue/90"
-                onClick={() => window.open(steerDiscount.url, "_blank")}
-              >
-                Claim Discount on Steer
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
         {/* Swag Shop */}
         <TabsContent value="swag">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -211,11 +158,6 @@ export default function RewardsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* M1 branding footer */}
-      <div className="flex justify-center pt-4 opacity-10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mobil1-logo-stacked.svg" alt="" className="h-24" />
-      </div>
     </div>
   );
 }

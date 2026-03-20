@@ -34,7 +34,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadInvoice } from "@/lib/supabase/storage";
 import { formatCurrency } from "@/lib/utils";
 import type { Invoice, LoyaltyLedgerEntry } from "@/types/database";
-import { Plus, Award, FileText, BookOpen } from "lucide-react";
+import { Plus, Award, FileText, BookOpen, Upload, RefreshCw, GraduationCap, Star, Eye } from "lucide-react";
+import Link from "next/link";
 
 export default function EarnAndTrackPage() {
   const { activeShop } = useShop();
@@ -66,7 +67,22 @@ export default function EarnAndTrackPage() {
     fetchData();
   }, [fetchData]);
 
+  type PointsView = "current" | "monthly" | "cumulative";
+  const [pointsView, setPointsView] = useState<PointsView>("current");
+
   if (guardLoading || !isApproved) return null;
+
+  const currentPoints = activeShop?.loyalty_points_balance || 0;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthlyEarned = ledger
+    .filter((e: LoyaltyLedgerEntry) => e.type === "credit" && new Date(e.created_at) >= monthStart)
+    .reduce((sum: number, e: LoyaltyLedgerEntry) => sum + e.points_delta, 0);
+  const cumulativeEarned = ledger
+    .filter((e: LoyaltyLedgerEntry) => e.type === "credit")
+    .reduce((sum: number, e: LoyaltyLedgerEntry) => sum + e.points_delta, 0);
+  const pointsDisplay = pointsView === "current" ? currentPoints : pointsView === "monthly" ? monthlyEarned : cumulativeEarned;
+  const pointsLabel = pointsView === "current" ? "current balance" : pointsView === "monthly" ? "earned this month" : "total earned all time";
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,42 +197,93 @@ export default function EarnAndTrackPage() {
         </Dialog>
       </div>
 
-      {/* Points balance card */}
+      {/* Points balance card — compact with toggle */}
       <Card className="border-exxon-red/20">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-exxon-red/10">
-              <Award className="h-8 w-8 text-exxon-red" />
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-exxon-red/10">
+              <Award className="h-6 w-6 text-exxon-red" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Current Balance</p>
-              <p className="text-4xl font-bold text-exxon-charcoal">
-                {activeShop?.loyalty_points_balance || 0}
-              </p>
-              <p className="text-sm text-muted-foreground">premium growth points</p>
+              <p className="text-xs text-muted-foreground">{pointsLabel}</p>
+              <p className="text-3xl font-bold text-exxon-charcoal">{pointsDisplay}</p>
+              <p className="text-xs text-muted-foreground">premium growth points</p>
+              <div className="flex gap-1 mt-2">
+                {(["current", "monthly", "cumulative"] as const).map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setPointsView(view)}
+                    className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                      pointsView === view
+                        ? "bg-exxon-red text-white"
+                        : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
+                    }`}
+                  >
+                    {view === "current" ? "Current" : view === "monthly" ? "Monthly" : "All Time"}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* How to earn info */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* CTA Buttons */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <Button className="bg-exxon-red text-white hover:bg-exxon-red-dark h-auto py-2.5 px-3" onClick={() => setDialogOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Invoice
+        </Button>
+        <Button variant="outline" className="border-exxon-blue text-exxon-blue hover:bg-exxon-blue/5 h-auto py-2.5 px-3">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Sync Oil Change Data
+        </Button>
+        <Button variant="outline" className="border-exxon-red text-exxon-red hover:bg-exxon-red/5 h-auto py-2.5 px-3" asChild>
+          <Link href="/training">
+            <GraduationCap className="h-4 w-4 mr-2" />
+            Complete Training
+          </Link>
+        </Button>
+        <Button variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 h-auto py-2.5 px-3" asChild>
+          <Link href="/dashboard">
+            <Eye className="h-4 w-4 mr-2" />
+            View Tier Status
+          </Link>
+        </Button>
+      </div>
+
+      {/* How to earn info — compact tiles with Status tile */}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold text-exxon-red">15%</p>
-            <p className="text-sm text-muted-foreground mt-1">back on purchases of $2,500+</p>
+          <CardContent className="py-3 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Stock-Up Promotions</p>
+            <p className="text-xl font-bold text-exxon-red">15%</p>
+            <p className="text-xs text-muted-foreground">back on purchases of $2,500+</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold text-exxon-blue">1 pt</p>
-            <p className="text-sm text-muted-foreground mt-1">per Mobil 1 oil change</p>
+          <CardContent className="py-3 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Performance Points</p>
+            <p className="text-xl font-bold text-exxon-blue">1 pt</p>
+            <p className="text-xs text-muted-foreground">per Mobil 1 oil change</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold text-exxon-charcoal">10 pts</p>
-            <p className="text-sm text-muted-foreground mt-1">per training completed</p>
+          <CardContent className="py-3 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Training</p>
+            <p className="text-xl font-bold text-exxon-charcoal">10 pts</p>
+            <p className="text-xs text-muted-foreground">per training completed</p>
+          </CardContent>
+        </Card>
+        <Card className="border-yellow-200">
+          <CardContent className="py-3 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Status</p>
+            <div className="flex justify-center gap-1 my-1">
+              {[0, 1, 2].map((i) => (
+                <Star key={i} className="h-5 w-5 text-gray-200 fill-gray-100" />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">3 stars to Gold</p>
           </CardContent>
         </Card>
       </div>
@@ -360,11 +427,6 @@ export default function EarnAndTrackPage() {
         </TabsContent>
       </Tabs>
 
-      {/* M1 branding footer */}
-      <div className="flex justify-center pt-4 opacity-10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mobil1-logo-stacked.svg" alt="" className="h-24" />
-      </div>
     </div>
   );
 }

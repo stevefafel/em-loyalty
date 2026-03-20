@@ -41,7 +41,6 @@ const enrollmentLinks = [
 ];
 
 const partnerLinks = [
-  { label: "Log in to Steer", url: "https://app.steercrm.com", logo: "/partners/steer-logo.svg" },
   { label: "Log in to AutoOps", url: "https://dashboard.autoops.com", logo: "/partners/autoops-logo.png" },
 ];
 
@@ -64,8 +63,8 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-60 flex-col border-r border-gray-200 bg-white shrink-0">
-      {/* Branding header — stacked M1 logo + program name */}
-      <div className="flex flex-col items-center gap-2 border-b border-gray-200 px-5 py-5">
+      {/* Branding header — stacked M1 logo + program name with extra spacing */}
+      <div className="flex flex-col items-center gap-5 border-b border-gray-200 px-5 py-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/mobil1-logo-stacked.svg" alt="Mobil 1" className="h-20" />
         <span className="text-sm font-bold uppercase tracking-wider text-exxon-charcoal">
@@ -112,13 +111,13 @@ export function Sidebar() {
           </a>
         ))}
 
-        {/* Pegasus logo */}
-        <div className="flex justify-center pt-2 pb-1">
+        {/* Pegasus logo — bigger and red */}
+        <div className="flex justify-center pt-3 pb-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/mobil-pegasus.svg"
+            src="/mobil-pegasus-red.svg"
             alt="Mobil Pegasus"
-            className="h-8 opacity-30"
+            className="h-28"
           />
         </div>
       </div>
