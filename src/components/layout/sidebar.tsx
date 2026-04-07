@@ -115,9 +115,9 @@ export function Sidebar() {
         <div className="flex justify-center pt-3 pb-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/mobil-pegasus-red.svg"
+            src="/Mobil_Pegasus_red_RGB-TM.png"
             alt="Mobil Pegasus"
-            className="h-28"
+            className="h-20"
           />
         </div>
       </div>

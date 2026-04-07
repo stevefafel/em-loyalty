@@ -7,6 +7,7 @@ import { useShop } from "@/context/shop-context";
 import { useEnrollmentGuard } from "@/hooks/use-enrollment-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import {
   Award,
   GraduationCap,
@@ -16,7 +17,6 @@ import {
   Droplets,
   Gift,
   RefreshCw,
-  Star,
   ShoppingCart,
 } from "lucide-react";
 import type { LoyaltyLedgerEntry } from "@/types/database";
@@ -95,22 +95,28 @@ function ShopDashboard() {
       ? "earned this month"
       : "total earned all time";
 
-  // Reward tiers based on cumulative points
-  const tiers = [
-    { name: "Tier 1", threshold: 250, reward: "$25 Visa" },
-    { name: "Tier 2", threshold: 500, reward: "$50 Visa" },
-    { name: "Tier 3", threshold: 1000, reward: "$100 Visa" },
-  ];
+  // Mock oil change data for last 3 months + current month
+  const mockOilChanges: { label: string; count: number }[] = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    mockOilChanges.push({
+      label: d.toLocaleDateString("en-US", { month: "short" }),
+      count: i === 3 ? 30 : i === 2 ? 15 : i === 1 ? 28 : 12, // mock data
+    });
+  }
 
-  // Find current tier progress
-  const nextTier = tiers.find((t) => currentPoints < t.threshold) || tiers[tiers.length - 1];
-  const prevThreshold = tiers[tiers.indexOf(nextTier) - 1]?.threshold || 0;
-  const progressPercent =
-    currentPoints >= nextTier.threshold
-      ? 100
-      : Math.round(
-          ((currentPoints - prevThreshold) / (nextTier.threshold - prevThreshold)) * 100
-        );
+  // Pegasus status: 3 consecutive months of 25+ oil changes
+  const pegasusThreshold = 25;
+  let consecutivePegasusMonths = 0;
+  for (let i = mockOilChanges.length - 1; i >= 0; i--) {
+    if (mockOilChanges[i].count >= pegasusThreshold) {
+      consecutivePegasusMonths++;
+    } else {
+      break;
+    }
+  }
+  const inPegasus = consecutivePegasusMonths >= 3;
+  const monthsToGo = inPegasus ? 0 : 3 - consecutivePegasusMonths;
 
   return (
     <div className="space-y-4">
@@ -249,147 +255,64 @@ function ShopDashboard() {
         </Card>
       </div>
 
-      {/* Month-over-month points bar chart (last 3 months) */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Points Earned (Last 3 Months)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4 h-24">
-            {(() => {
-              const months: { label: string; earned: number }[] = [];
-              for (let i = 2; i >= 0; i--) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-                const earned = ledger
-                  .filter(
-                    (e) =>
-                      e.type === "credit" &&
-                      new Date(e.created_at) >= d &&
-                      new Date(e.created_at) <= end
-                  )
-                  .reduce((sum, e) => sum + e.points_delta, 0);
-                months.push({
-                  label: d.toLocaleDateString("en-US", { month: "short" }),
-                  earned,
-                });
-              }
-              const maxVal = Math.max(...months.map((m) => m.earned), 1);
-              return months.map((m) => (
-                <div key={m.label} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-xs font-semibold text-exxon-charcoal">
-                    {m.earned}
-                  </span>
-                  <div className="w-full flex justify-center">
-                    <div
-                      className="w-10 rounded-t bg-gradient-to-t from-exxon-red to-exxon-blue transition-all duration-500"
-                      style={{
-                        height: `${Math.max((m.earned / maxVal) * 100, 4)}px`,
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">{m.label}</span>
-                </div>
-              ));
-            })()}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Gold Status Tracker */}
+      {/* Pegasus Status Tracker */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <CardTitle className="text-base">Gold Status Tracker</CardTitle>
+              <CardTitle className="text-lg font-bold">Pegasus Status Tracker</CardTitle>
             </div>
-            <span className="text-sm text-muted-foreground">
-              {currentPoints >= nextTier.threshold
-                ? "All tiers unlocked!"
-                : `${nextTier.threshold - currentPoints} more points to ${nextTier.name}`}
+            <span className="text-base font-semibold text-muted-foreground">
+              {inPegasus
+                ? "Pegasus Status achieved!"
+                : `${monthsToGo} more month${monthsToGo !== 1 ? "s" : ""} to Pegasus Status`}
             </span>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Left side — Monthly progress tracker + progress bar */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Points Progress</p>
-              <div className="relative">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold bg-exxon-red text-white px-2 py-0.5 rounded">
-                    START
-                  </span>
-                  {tiers.map((tier) => (
-                    <span
-                      key={tier.name}
-                      className={`text-xs font-medium ${
-                        currentPoints >= tier.threshold
-                          ? "text-exxon-blue"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {tier.name}
+          <div className="flex items-center justify-center px-8">
+            {mockOilChanges.map((m, idx) => {
+              const isPegasus = m.count >= pegasusThreshold;
+              return (
+                <div key={m.label} className="flex items-center">
+                  {/* Connector line before (except first) */}
+                  {idx > 0 && (
+                    <div className="w-16 md:w-24 h-1 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full" />
+                  )}
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-base font-semibold text-exxon-charcoal">
+                      {m.count} oil changes
                     </span>
-                  ))}
-                </div>
-                <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-exxon-red to-exxon-blue rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-muted-foreground">0 pts</span>
-                  {tiers.map((tier) => (
-                    <div key={tier.name} className="text-center">
-                      <div
-                        className={`text-xs font-semibold ${
-                          currentPoints >= tier.threshold
-                            ? "text-exxon-blue"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {tier.threshold}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">{tier.reward}</div>
+                    <div className="w-20 h-20 rounded-full flex items-center justify-center bg-exxon-charcoal ring-4 ring-gray-200">
+                      {isPegasus && (
+                        <Image
+                          src="/Mobil_Pegasus_red_RGB-TM.png"
+                          alt="Pegasus Mode"
+                          width={64}
+                          height={64}
+                        />
+                      )}
                     </div>
-                  ))}
+                    <span className="text-sm font-medium text-muted-foreground">{m.label}</span>
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-center gap-8 mt-5 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-exxon-charcoal" />
+              <span>Under 25 oil changes</span>
             </div>
-
-            {/* Right side — Gold Stars streak tracker */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Gold Stars (25+ Oil Changes/Month)</p>
-              <div className="flex items-center gap-3">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex flex-col items-center gap-1">
-                    <Star
-                      className={`h-10 w-10 ${
-                        i < 0 /* placeholder: no real oil change data yet */
-                          ? "text-yellow-400 fill-yellow-400"
-                          : "text-gray-200 fill-gray-100"
-                      }`}
-                    />
-                    <span className="text-[10px] text-muted-foreground">Month {i + 1}</span>
-                  </div>
-                ))}
-                <div className="ml-2 pl-3 border-l border-gray-200">
-                  <div className="flex items-center gap-1.5">
-                    <Star className="h-5 w-5 text-gray-200 fill-gray-100" />
-                    <span className="text-sm font-semibold text-muted-foreground">Not in Gold</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    3 stars in a row = Gold Status (+10 pts/month)
-                  </p>
-                </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-exxon-charcoal flex items-center justify-center">
+                <Image src="/Mobil_Pegasus_red_RGB-TM.png" alt="" width={14} height={14} />
               </div>
+              <span>Pegasus Mode</span>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4 italic">
-            Earn Gold Status by completing 3 consecutive months of 25+ oil changes. Gold shops earn an extra 10 points every month they maintain Gold.
+          <p className="text-sm text-muted-foreground mt-4 italic text-center">
+            3 consecutive Pegasus months = Pegasus Status (+10 pts/month)
           </p>
         </CardContent>
       </Card>
