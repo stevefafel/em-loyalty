@@ -20,6 +20,14 @@ const partners = [
     highlight: "#1 Online Scheduling Tool for Auto Shops",
     loginUrl: "https://dashboard.autoops.com",
   },
+  {
+    name: "Steer",
+    logo: "/partners/steer-logo.svg",
+    description:
+      "Steer helps auto repair shops drive repeat business with automated customer communication. Send service reminders, thank-you messages, and targeted promotions to keep customers coming back. Increase retention, boost reviews, and grow revenue with smart marketing built for auto shops.",
+    highlight: "Automated Customer Retention for Auto Shops",
+    loginUrl: "https://app.steercrm.com",
+  },
 ];
 
 export default function PartnersPage() {
@@ -29,7 +37,7 @@ export default function PartnersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-exxon-charcoal">Partners</h1>
+      <h1 className="text-3xl font-bold text-exxon-charcoal">Technology Providers</h1>
       <p className="text-muted-foreground">
         Access exclusive partner tools and discounts available to Premium Growth members.
       </p>

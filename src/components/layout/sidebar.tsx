@@ -25,7 +25,7 @@ const shopUserLinks = [
   { href: "/rewards", label: "Rewards", icon: Gift },
   { href: "/training", label: "Training", icon: GraduationCap },
   { href: "/collateral", label: "Marketing Materials", icon: FileDown },
-  { href: "/partners", label: "Partners", icon: Handshake },
+  { href: "/partners", label: "Technology Providers", icon: Handshake },
 ];
 
 const adminLinks = [
@@ -42,6 +42,7 @@ const enrollmentLinks = [
 
 const partnerLinks = [
   { label: "Log in to AutoOps", url: "https://dashboard.autoops.com", logo: "/partners/autoops-logo.png" },
+  { label: "Log in to Steer", url: "https://app.steercrm.com", logo: "/partners/steer-logo.svg" },
 ];
 
 export function Sidebar() {
