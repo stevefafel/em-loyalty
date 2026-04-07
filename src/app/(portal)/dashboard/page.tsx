@@ -120,21 +120,17 @@ function ShopDashboard() {
           {/* Left half — text content */}
           <div className="relative z-10 p-5 md:p-6 flex flex-col justify-center">
             <h1 className="text-2xl md:text-3xl font-bold text-white">
-              Welcome, {activeShop?.name}
+              Welcome,<br />
+              <span className="whitespace-nowrap">{activeShop?.name}</span>
             </h1>
             <p className="text-white/80 text-sm font-semibold mt-2 uppercase tracking-wider">
               Premium Growth
             </p>
-            <p className="text-white/70 mt-2 text-sm">
+            <p className="text-white/70 mt-2 text-xs">
               Earn points on purchases, oil changes, and training to unlock rewards.
             </p>
           </div>
-          {/* Right half — interchangeable banner image */}
-          <div className="hidden md:flex items-center justify-center p-4 bg-white/5">
-            <div className="w-full h-24 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center">
-              <span className="text-white/40 text-sm">Banner Image</span>
-            </div>
-          </div>
+          {/* Right half — interchangeable banner image (hidden until upload is implemented) */}
         </div>
       </div>
 
@@ -193,22 +189,26 @@ function ShopDashboard() {
             <Award className="h-5 w-5 text-exxon-red" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{pointsDisplay}</div>
-            <p className="text-xs text-muted-foreground mt-1">{pointsLabel}</p>
-            <div className="flex gap-1 mt-3">
-              {(["current", "monthly", "cumulative"] as PointsView[]).map((view) => (
-                <button
-                  key={view}
-                  onClick={() => setPointsView(view)}
-                  className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
-                    pointsView === view
-                      ? "bg-exxon-red text-white"
-                      : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
-                  }`}
-                >
-                  {view === "current" ? "Current" : view === "monthly" ? "Monthly" : "All Time"}
-                </button>
-              ))}
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-3xl font-bold">{pointsDisplay}</div>
+                <p className="text-xs text-muted-foreground mt-1">{pointsLabel}</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                {(["current", "monthly", "cumulative"] as PointsView[]).map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setPointsView(view)}
+                    className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                      pointsView === view
+                        ? "bg-exxon-red text-white"
+                        : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
+                    }`}
+                  >
+                    {view === "current" ? "Current" : view === "monthly" ? "Monthly" : "All Time"}
+                  </button>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
