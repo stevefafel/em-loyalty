@@ -18,6 +18,7 @@ import {
   Gift,
   RefreshCw,
   ShoppingCart,
+  Check,
 } from "lucide-react";
 import type { LoyaltyLedgerEntry, OilChangeCount } from "@/types/database";
 import {
@@ -107,14 +108,23 @@ function ShopDashboard() {
       ? "earned this month"
       : "total earned all time";
 
-  // Pegasus status: 3 consecutive months of 25+ oil changes (last 4 months shown)
-  const pegasusBuckets = aggregateOilChangesByMonth(oilChanges, 4, now);
+  // Pegasus status: 3 consecutive months of 25+ oil changes
+  const pegasusBuckets = aggregateOilChangesByMonth(oilChanges, 3, now);
   const oilChangeMonths = pegasusBuckets.map((b) => ({
-    label: b.monthStart.toLocaleDateString("en-US", { month: "short" }),
+    label: b.isCurrent
+      ? "Current Month"
+      : b.monthStart.toLocaleDateString("en-US", { month: "long" }),
     count: b.count,
   }));
   const pegasusThreshold = PEGASUS_THRESHOLD;
-  const { inPegasus, monthsToGo } = computePegasusStatus(pegasusBuckets);
+  const { inPegasus, monthsToGo, consecutive } = computePegasusStatus(pegasusBuckets);
+  const currentMonthOilChanges =
+    pegasusBuckets.find((b) => b.isCurrent)?.count ?? 0;
+  const pegasusBarMax = Math.max(
+    ...oilChangeMonths.map((m) => m.count),
+    pegasusThreshold
+  );
+  const gaugePct = Math.min((currentMonthOilChanges / 50) * 100, 100);
 
   return (
     <div className="space-y-4">
@@ -226,11 +236,8 @@ function ShopDashboard() {
             <Droplets className="h-5 w-5 text-exxon-blue" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">--</div>
+            <div className="text-3xl font-bold">{currentMonthOilChanges}</div>
             <p className="text-xs text-muted-foreground mt-1">this month</p>
-            <p className="text-xs text-muted-foreground mt-1 italic">
-              Data imported from external source
-            </p>
           </CardContent>
         </Card>
 
@@ -257,9 +264,7 @@ function ShopDashboard() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg font-bold">Pegasus Status Tracker</CardTitle>
-            </div>
+            <CardTitle className="text-lg font-bold">Pegasus Status Tracker</CardTitle>
             <span className="text-base font-semibold text-muted-foreground">
               {inPegasus
                 ? "Pegasus Status achieved!"
@@ -268,49 +273,162 @@ function ShopDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center px-8">
-            {oilChangeMonths.map((m, idx) => {
-              const isPegasus = m.count >= pegasusThreshold;
-              return (
-                <div key={m.label} className="flex items-center">
-                  {/* Connector line before (except first) */}
-                  {idx > 0 && (
-                    <div className="w-16 md:w-24 h-1 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full" />
-                  )}
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-base font-semibold text-exxon-charcoal">
-                      {m.count} oil changes
-                    </span>
-                    <div className="w-20 h-20 rounded-full flex items-center justify-center bg-exxon-charcoal ring-4 ring-gray-200">
-                      {isPegasus && (
-                        <Image
-                          src="/Mobil_Pegasus_red_RGB-TM.png"
-                          alt="Pegasus Mode"
-                          width={64}
-                          height={64}
-                        />
-                      )}
-                    </div>
-                    <span className="text-sm font-medium text-muted-foreground">{m.label}</span>
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.75fr_0.5fr_0.75fr] gap-6 lg:gap-0 lg:divide-x divide-gray-200 lg:items-stretch">
+            {/* Current-month gauge */}
+            <div className="flex flex-col items-center justify-center text-center lg:px-6 w-full">
+              <p className="text-sm font-bold text-exxon-charcoal leading-tight">
+                Mobil 1 Oil Changes
+              </p>
+              <p className="text-sm font-bold text-exxon-charcoal leading-tight">
+                (Current Month)
+              </p>
+              <div className="mt-6 relative w-full max-w-[200px]">
+                <span
+                  className="absolute -top-5 -translate-x-1/2 text-base font-bold text-exxon-charcoal"
+                  style={{ left: `${gaugePct}%` }}
+                >
+                  {currentMonthOilChanges}
+                </span>
+                <div className="relative h-2 bg-gray-200 rounded-full">
+                  <div
+                    className="h-full bg-exxon-blue rounded-full transition-all"
+                    style={{ width: `${gaugePct}%` }}
+                  />
+                  <div className="absolute left-1/2 -translate-x-1/2 -top-1.5 w-0.5 h-5 bg-exxon-blue" />
                 </div>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-center gap-8 mt-5 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-exxon-charcoal" />
-              <span>Under 25 oil changes</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-exxon-charcoal flex items-center justify-center">
-                <Image src="/Mobil_Pegasus_red_RGB-TM.png" alt="" width={14} height={14} />
+                <div className="flex justify-between text-xs font-semibold text-exxon-charcoal mt-2">
+                  <span>Start</span>
+                  <span>25</span>
+                  <span>50+</span>
+                </div>
+                <p className="text-center text-sm font-bold text-exxon-charcoal mt-2">
+                  Pegasus Mode
+                </p>
               </div>
-              <span>Pegasus Mode</span>
+            </div>
+
+            {/* Bar chart — 3 months */}
+            <div className="flex flex-col justify-center mx-auto w-full lg:px-6">
+              <div className="flex items-end justify-around gap-3 h-44 px-4 border-b-2 border-exxon-blue">
+                {oilChangeMonths.map((m) => {
+                  const heightPct = (m.count / pegasusBarMax) * 100;
+                  return (
+                    <div key={m.label} className="flex flex-col items-center h-full">
+                      <span className="text-base font-semibold text-exxon-charcoal mb-1">
+                        {m.count}
+                      </span>
+                      <div className="flex-1 flex items-end">
+                        <div
+                          className="w-12 bg-exxon-blue"
+                          style={{ height: `${heightPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-around gap-3 px-4 mt-2">
+                {oilChangeMonths.map((m) => {
+                  const isPegasus = m.count >= pegasusThreshold;
+                  return (
+                    <div key={m.label} className="flex flex-col items-center w-24">
+                      <div className="h-10 flex items-center justify-center">
+                        {isPegasus && (
+                          <Image
+                            src="/Mobil_Pegasus_red_RGB-TM.png"
+                            alt="Pegasus Mode"
+                            width={36}
+                            height={36}
+                          />
+                        )}
+                      </div>
+                      <div className="border-t-2 border-exxon-charcoal w-full" />
+                      <span className="text-sm font-bold text-exxon-charcoal mt-1 text-center leading-tight">
+                        {m.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Big Pegasus Status icon with progress indicator */}
+            <div className="flex flex-col items-center justify-center lg:px-6">
+              <div className="relative">
+                <Image
+                  src="/Mobil_Pegasus_red_RGB-TM.png"
+                  alt="Pegasus Status"
+                  width={80}
+                  height={80}
+                />
+                {inPegasus && (
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 shadow-md ring-2 ring-white">
+                    <Check className="h-4 w-4 text-white" strokeWidth={3} />
+                  </div>
+                )}
+              </div>
+              <div className="border-t-2 border-exxon-charcoal w-24 mt-2" />
+              <span className="text-sm font-bold text-exxon-charcoal mt-1 text-center leading-tight">
+                Pegasus<br />Status
+              </span>
+              <div className="flex gap-1.5 mt-3">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-2 w-6 rounded-full transition-colors ${
+                      i < consecutive ? "bg-exxon-red" : "bg-gray-200"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span
+                className={`text-xs font-semibold mt-1.5 ${
+                  inPegasus ? "text-green-700" : "text-muted-foreground"
+                }`}
+              >
+                {inPegasus ? "Achieved" : `${consecutive} of 3 months`}
+              </span>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-col justify-center lg:px-6 w-full">
+              <div className="flex items-start gap-3">
+                <Image
+                  src="/Mobil_Pegasus_red_RGB-TM.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="shrink-0"
+                />
+                <div className="text-sm text-exxon-charcoal leading-snug">
+                  <p className="font-bold">Pegasus Status</p>
+                  <p className="text-muted-foreground">
+                    3 months in a row of Pegasus Mode*
+                  </p>
+                </div>
+              </div>
+              <div className="my-3 border-t border-gray-200" />
+              <div className="flex items-start gap-3">
+                <Image
+                  src="/Mobil_Pegasus_red_RGB-TM.png"
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="shrink-0 mt-1"
+                />
+                <div className="text-sm text-exxon-charcoal leading-snug">
+                  <p className="font-bold">Pegasus Mode</p>
+                  <p className="text-muted-foreground">
+                    25+ oil changes in 1 month
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-4 italic text-center">
-            3 consecutive Pegasus months = Pegasus Status (+10 pts/month)
+
+          <p className="text-sm text-exxon-charcoal mt-6">
+            Shops will receive a 10 point bonus each month they maintain{" "}
+            <span className="font-bold">Pegasus Status</span>.
           </p>
         </CardContent>
       </Card>

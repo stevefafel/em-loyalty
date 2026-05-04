@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useEnrollmentGuard } from "@/hooks/use-enrollment-guard";
 import { useShop } from "@/context/shop-context";
 import {
@@ -19,6 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Trophy, Medal, Award } from "lucide-react";
+import type { OilChangeCount } from "@/types/database";
+import { aggregateOilChangesByMonth } from "@/lib/pegasus";
 
 const tiers = [
   {
@@ -68,8 +71,38 @@ const tiers = [
 export default function PerksPage() {
   const { isApproved, isLoading } = useEnrollmentGuard();
   const { activeShop } = useShop();
+  const [oilChanges, setOilChanges] = useState<OilChangeCount[]>([]);
+
+  const fetchOilChanges = useCallback(async () => {
+    if (!activeShop) return;
+    const res = await fetch(`/api/oil-changes?shop_id=${activeShop.id}`);
+    if (res.ok) {
+      const { data } = await res.json();
+      setOilChanges(data || []);
+    }
+  }, [activeShop]);
+
+  useEffect(() => {
+    if (isApproved) fetchOilChanges();
+  }, [isApproved, fetchOilChanges]);
 
   if (isLoading || !isApproved) return null;
+
+  const now = new Date();
+  const currentMonthLabel = now.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  const currentMonthOilChanges =
+    aggregateOilChangesByMonth(oilChanges, 1, now)[0]?.count ?? 0;
+  const currentTier =
+    currentMonthOilChanges >= 200
+      ? "Gold"
+      : currentMonthOilChanges >= 100
+      ? "Silver"
+      : currentMonthOilChanges >= 50
+      ? "Bronze"
+      : null;
 
   return (
     <div className="space-y-6">
@@ -119,7 +152,7 @@ export default function PerksPage() {
         <CardHeader>
           <CardTitle>Current Month Performance</CardTitle>
           <CardDescription>
-            {activeShop?.name} — February 2026
+            {activeShop?.name} — {currentMonthLabel}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -134,7 +167,7 @@ export default function PerksPage() {
             <TableBody>
               <TableRow>
                 <TableCell>Mobil 1 Oil Changes</TableCell>
-                <TableCell className="font-semibold">--</TableCell>
+                <TableCell className="font-semibold">{currentMonthOilChanges}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className="border-gray-400">
                     Tracking
@@ -143,11 +176,17 @@ export default function PerksPage() {
               </TableRow>
               <TableRow>
                 <TableCell>Current Tier</TableCell>
-                <TableCell className="font-semibold">--</TableCell>
+                <TableCell className="font-semibold">{currentTier ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="border-gray-400">
-                    POC
-                  </Badge>
+                  {currentTier ? (
+                    <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
+                      {currentTier}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-gray-400">
+                      Below Bronze
+                    </Badge>
+                  )}
                 </TableCell>
               </TableRow>
             </TableBody>
