@@ -125,3 +125,12 @@ export interface LoyaltyLedgerEntry {
   description: string | null;
   created_at: string;
 }
+
+export interface OilChangeCount {
+  id: string;
+  shop_id: string;
+  date: string;
+  count: number;
+  created_at: string;
+  updated_at: string;
+}

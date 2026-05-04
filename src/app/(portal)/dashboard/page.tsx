@@ -19,7 +19,12 @@ import {
   RefreshCw,
   ShoppingCart,
 } from "lucide-react";
-import type { LoyaltyLedgerEntry } from "@/types/database";
+import type { LoyaltyLedgerEntry, OilChangeCount } from "@/types/database";
+import {
+  PEGASUS_THRESHOLD,
+  aggregateOilChangesByMonth,
+  computePegasusStatus,
+} from "@/lib/pegasus";
 
 export default function DashboardPage() {
   const { isAdmin } = useAuth();
@@ -38,14 +43,16 @@ function ShopDashboard() {
   const { isApproved, isLoading } = useEnrollmentGuard();
   const [trainingCount, setTrainingCount] = useState<number | null>(null);
   const [ledger, setLedger] = useState<LoyaltyLedgerEntry[]>([]);
+  const [oilChanges, setOilChanges] = useState<OilChangeCount[]>([]);
   const [pointsView, setPointsView] = useState<PointsView>("current");
 
   const fetchStats = useCallback(async () => {
     if (!activeShop) return;
 
-    const [trainingRes, ledgerRes] = await Promise.all([
+    const [trainingRes, ledgerRes, oilChangesRes] = await Promise.all([
       fetch("/api/training"),
       fetch(`/api/points?shop_id=${activeShop.id}`),
+      fetch(`/api/oil-changes?shop_id=${activeShop.id}`),
     ]);
 
     if (trainingRes.ok) {
@@ -59,6 +66,11 @@ function ShopDashboard() {
     if (ledgerRes.ok) {
       const ledgerData = await ledgerRes.json();
       setLedger(ledgerData.data || []);
+    }
+
+    if (oilChangesRes.ok) {
+      const oilChangesData = await oilChangesRes.json();
+      setOilChanges(oilChangesData.data || []);
     }
   }, [activeShop]);
 
@@ -95,28 +107,14 @@ function ShopDashboard() {
       ? "earned this month"
       : "total earned all time";
 
-  // Mock oil change data for last 3 months + current month
-  const mockOilChanges: { label: string; count: number }[] = [];
-  for (let i = 3; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    mockOilChanges.push({
-      label: d.toLocaleDateString("en-US", { month: "short" }),
-      count: i === 3 ? 30 : i === 2 ? 15 : i === 1 ? 28 : 12, // mock data
-    });
-  }
-
-  // Pegasus status: 3 consecutive months of 25+ oil changes
-  const pegasusThreshold = 25;
-  let consecutivePegasusMonths = 0;
-  for (let i = mockOilChanges.length - 1; i >= 0; i--) {
-    if (mockOilChanges[i].count >= pegasusThreshold) {
-      consecutivePegasusMonths++;
-    } else {
-      break;
-    }
-  }
-  const inPegasus = consecutivePegasusMonths >= 3;
-  const monthsToGo = inPegasus ? 0 : 3 - consecutivePegasusMonths;
+  // Pegasus status: 3 consecutive months of 25+ oil changes (last 4 months shown)
+  const pegasusBuckets = aggregateOilChangesByMonth(oilChanges, 4, now);
+  const oilChangeMonths = pegasusBuckets.map((b) => ({
+    label: b.monthStart.toLocaleDateString("en-US", { month: "short" }),
+    count: b.count,
+  }));
+  const pegasusThreshold = PEGASUS_THRESHOLD;
+  const { inPegasus, monthsToGo } = computePegasusStatus(pegasusBuckets);
 
   return (
     <div className="space-y-4">
@@ -271,7 +269,7 @@ function ShopDashboard() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center px-8">
-            {mockOilChanges.map((m, idx) => {
+            {oilChangeMonths.map((m, idx) => {
               const isPegasus = m.count >= pegasusThreshold;
               return (
                 <div key={m.label} className="flex items-center">

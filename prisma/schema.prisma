@@ -60,11 +60,12 @@ model Shop {
   created_at            DateTime      @default(now()) @db.Timestamptz()
   updated_at            DateTime      @default(now()) @db.Timestamptz()
 
-  user_shops      UserShop[]
-  invoices        Invoice[]
-  training_logs   TrainingLog[]
-  collateral_logs CollateralLog[]
-  loyalty_ledger  LoyaltyLedger[]
+  user_shops        UserShop[]
+  invoices          Invoice[]
+  training_logs     TrainingLog[]
+  collateral_logs   CollateralLog[]
+  loyalty_ledger    LoyaltyLedger[]
+  oil_change_counts OilChangeCount[]
 
   @@index([program_status])
   @@map("shops")
@@ -216,6 +217,21 @@ model CollateralLog {
 
   @@index([user_id, shop_id])
   @@map("collateral_log")
+}
+
+model OilChangeCount {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shop_id    String   @db.Uuid
+  date       DateTime @db.Date
+  count      Int
+  created_at DateTime @default(now()) @db.Timestamptz()
+  updated_at DateTime @default(now()) @db.Timestamptz()
+
+  shop Shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@unique([shop_id, date])
+  @@index([shop_id, date])
+  @@map("oil_change_counts")
 }
 
 model LoyaltyLedger {

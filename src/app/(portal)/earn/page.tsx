@@ -33,9 +33,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadInvoice } from "@/lib/supabase/storage";
 import { formatCurrency } from "@/lib/utils";
-import type { Invoice, LoyaltyLedgerEntry } from "@/types/database";
-import { Plus, Award, FileText, BookOpen, Upload, RefreshCw, GraduationCap, Star, Eye } from "lucide-react";
+import type { Invoice, LoyaltyLedgerEntry, OilChangeCount } from "@/types/database";
+import {
+  PEGASUS_THRESHOLD,
+  aggregateOilChangesByMonth,
+  computePegasusStatus,
+} from "@/lib/pegasus";
+import { Plus, Award, FileText, BookOpen, Upload, RefreshCw, GraduationCap, Eye } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function EarnAndTrackPage() {
   const { activeShop } = useShop();
@@ -43,6 +49,7 @@ export default function EarnAndTrackPage() {
 
   const [invoices, setInvoices] = useState<(Invoice & { users: { name: string } })[]>([]);
   const [ledger, setLedger] = useState<LoyaltyLedgerEntry[]>([]);
+  const [oilChanges, setOilChanges] = useState<OilChangeCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -52,14 +59,17 @@ export default function EarnAndTrackPage() {
 
   const fetchData = useCallback(async () => {
     if (!activeShop) return;
-    const [invoicesRes, ledgerRes] = await Promise.all([
+    const [invoicesRes, ledgerRes, oilChangesRes] = await Promise.all([
       fetch(`/api/invoices?shop_id=${activeShop.id}`),
       fetch(`/api/points?shop_id=${activeShop.id}`),
+      fetch(`/api/oil-changes?shop_id=${activeShop.id}`),
     ]);
     const invoicesData = await invoicesRes.json();
     const ledgerData = await ledgerRes.json();
+    const oilChangesData = await oilChangesRes.json();
     setInvoices(invoicesData.data || []);
     setLedger(ledgerData.data || []);
+    setOilChanges(oilChangesData.data || []);
     setIsLoading(false);
   }, [activeShop]);
 
@@ -83,6 +93,16 @@ export default function EarnAndTrackPage() {
     .reduce((sum: number, e: LoyaltyLedgerEntry) => sum + e.points_delta, 0);
   const pointsDisplay = pointsView === "current" ? currentPoints : pointsView === "monthly" ? monthlyEarned : cumulativeEarned;
   const pointsLabel = pointsView === "current" ? "current balance" : pointsView === "monthly" ? "earned this month" : "total earned all time";
+
+  // Pegasus status: 3 consecutive months of 25+ oil changes
+  const pegasusBuckets = aggregateOilChangesByMonth(oilChanges, 3, now);
+  const pegasusMonths = pegasusBuckets.map((b) => ({
+    label: b.isCurrent ? "Current Month" : b.label,
+    count: b.count,
+  }));
+  const { inPegasus, monthsToGo } = computePegasusStatus(pegasusBuckets);
+  const pegasusThreshold = PEGASUS_THRESHOLD;
+  const pegasusMaxCount = Math.max(...pegasusMonths.map((m) => m.count), pegasusThreshold);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,7 +272,7 @@ export default function EarnAndTrackPage() {
         </Button>
       </div>
 
-      {/* How to earn info — compact tiles with Status tile */}
+      {/* How to earn info — compact tiles with Pegasus Status tracker */}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="py-3 text-center">
@@ -276,14 +296,51 @@ export default function EarnAndTrackPage() {
           </CardContent>
         </Card>
         <Card className="border-yellow-200">
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground mb-0.5">Status</p>
-            <div className="flex justify-center gap-1 my-1">
-              {[0, 1, 2].map((i) => (
-                <Star key={i} className="h-5 w-5 text-gray-200 fill-gray-100" />
-              ))}
+          <CardContent className="py-3">
+            <div className="flex items-stretch gap-2">
+              {/* Bar chart */}
+              <div className="flex-1 flex items-end justify-around gap-1 h-28">
+                {pegasusMonths.map((m) => {
+                  const isPegasus = m.count >= pegasusThreshold;
+                  const heightPct = (m.count / pegasusMaxCount) * 100;
+                  return (
+                    <div key={m.label} className="flex flex-col items-center h-full">
+                      <span className="text-sm font-semibold text-exxon-charcoal mb-0.5">
+                        {m.count}
+                      </span>
+                      <div className="flex-1 flex items-end">
+                        <div
+                          className="w-5 bg-exxon-blue rounded-t-sm"
+                          style={{ height: `${heightPct}%` }}
+                        />
+                      </div>
+                      <div className="h-9 mt-1 flex items-center justify-center">
+                        {isPegasus && (
+                          <Image
+                            src="/Mobil_Pegasus_red_RGB-TM.png"
+                            alt="Pegasus Mode"
+                            width={32}
+                            height={32}
+                          />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-muted-foreground text-center leading-tight">
+                        {m.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Status indicator */}
+              <div className="flex flex-col items-center justify-center border-l pl-2 min-w-[72px]">
+                <p className="text-sm font-bold text-exxon-charcoal text-center leading-tight">
+                  {inPegasus
+                    ? "Achieved!"
+                    : `${monthsToGo} month${monthsToGo !== 1 ? "s" : ""} away`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 text-center">Pegasus Status</p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">3 stars to Gold</p>
           </CardContent>
         </Card>
       </div>
