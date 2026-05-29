@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, ArrowRight, Package } from "lucide-react";
+import { GraduationCap, ArrowRight, Package, CheckCircle } from "lucide-react";
 import type { TrainingModule } from "@/types/database";
 
 export default function TrainingPage() {
@@ -79,18 +79,29 @@ export default function TrainingPage() {
                         <GraduationCap className="h-5 w-5 text-exxon-blue" />
                       )}
                     </div>
-                    <Badge variant="outline">
-                      {mod.content_type === "scorm"
-                        ? "SCORM"
-                        : `${mod.questions.length} Questions`}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {mod.completed && (
+                        <Badge
+                          variant="outline"
+                          className="border-green-500 text-green-700 bg-green-50"
+                        >
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                          Completed
+                        </Badge>
+                      )}
+                      <Badge variant="outline">
+                        {mod.content_type === "scorm"
+                          ? "SCORM"
+                          : `${mod.questions.length} Questions`}
+                      </Badge>
+                    </div>
                   </div>
                   <CardTitle className="mt-4">{mod.title}</CardTitle>
                   <CardDescription>{mod.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center text-sm text-exxon-red font-medium">
-                    Start Module
+                    {mod.completed ? "Review Module" : "Start Module"}
                     <ArrowRight className="ml-1 h-4 w-4" />
                   </div>
                 </CardContent>

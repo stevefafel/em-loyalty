@@ -54,6 +54,9 @@ export interface TrainingModule {
   content_type: TrainingContentType;
   questions: QuizQuestion[];
   created_at: string;
+  // Per-user completion status (populated by the training list endpoint)
+  completed?: boolean;
+  completed_at?: string | null;
 }
 
 export interface QuizQuestion {

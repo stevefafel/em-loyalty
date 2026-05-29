@@ -73,7 +73,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const data = await prisma.trainingModule.findMany({
+    const modules = await prisma.trainingModule.findMany({
       select: {
         id: true,
         title: true,
@@ -86,6 +86,22 @@ export async function GET() {
       },
       orderBy: { created_at: "asc" },
     });
+
+    // Annotate each module with this user's completion status.
+    const logs = await prisma.trainingLog.groupBy({
+      by: ["module_id"],
+      where: { user_id: session.userId },
+      _max: { completed_at: true },
+    });
+    const completionByModule = new Map(
+      logs.map((l) => [l.module_id, l._max.completed_at])
+    );
+
+    const data = modules.map((m) => ({
+      ...m,
+      completed: completionByModule.has(m.id),
+      completed_at: completionByModule.get(m.id) ?? null,
+    }));
 
     return NextResponse.json({ data });
   } catch (err) {

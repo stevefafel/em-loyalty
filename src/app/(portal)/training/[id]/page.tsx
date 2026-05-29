@@ -91,7 +91,7 @@ export default function TrainingModulePage() {
 
   const handleScormComplete = (score: number) => {
     toast.success("Training completed!", {
-      description: `SCORM module finished with score: ${score}`,
+      description: "Your completion has been recorded.",
     });
     // Call the training complete endpoint to record and award points
     fetch(`/api/training/${id}/complete`, {
@@ -103,6 +103,8 @@ export default function TrainingModulePage() {
 
   const isScorm = module.content_type === "scorm";
   const allAnswered = answers.every((a) => a >= 0);
+  const isCompleted = logs.length > 0;
+  const latestCompletion = isCompleted ? logs[0].completed_at : null;
 
   return (
     <div
@@ -113,11 +115,25 @@ export default function TrainingModulePage() {
           {module.title}
         </h1>
         <p className="text-muted-foreground mt-1">{module.description}</p>
-        {isScorm && (
-          <Badge variant="outline" className="mt-2 border-exxon-blue text-exxon-blue">
-            Interactive SCORM Training
-          </Badge>
-        )}
+        <div className="mt-2 flex items-center gap-2">
+          {isScorm && (
+            <Badge variant="outline" className="border-exxon-blue text-exxon-blue">
+              Interactive SCORM Training
+            </Badge>
+          )}
+          {isCompleted && (
+            <Badge
+              variant="outline"
+              className="border-green-500 text-green-700 bg-green-50"
+            >
+              <CheckCircle className="h-3.5 w-3.5 mr-1" />
+              Completed
+              {latestCompletion
+                ? ` · ${new Date(latestCompletion).toLocaleDateString()}`
+                : ""}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* SCORM Content */}
@@ -275,15 +291,23 @@ export default function TrainingModulePage() {
       {logs.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Attempt History</CardTitle>
+            <CardTitle>
+              {isScorm ? "Completion History" : "Attempt History"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Result</TableHead>
+                  {isScorm ? (
+                    <TableHead>Status</TableHead>
+                  ) : (
+                    <>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Result</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -292,39 +316,39 @@ export default function TrainingModulePage() {
                     <TableCell>
                       {new Date(log.completed_at).toLocaleString()}
                     </TableCell>
-                    <TableCell>
-                      {isScorm ? `${log.score}%` : `${log.score}/5`}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          isScorm
-                            ? log.score >= 80
-                              ? "border-green-500 text-green-700"
-                              : log.score >= 60
-                              ? "border-yellow-500 text-yellow-700"
-                              : "border-red-500 text-red-700"
-                            : log.score >= 4
-                            ? "border-green-500 text-green-700"
-                            : log.score >= 3
-                            ? "border-yellow-500 text-yellow-700"
-                            : "border-red-500 text-red-700"
-                        }
-                      >
-                        {isScorm
-                          ? log.score >= 80
-                            ? "Excellent"
-                            : log.score >= 60
-                            ? "Passed"
-                            : "Needs Improvement"
-                          : log.score >= 4
-                          ? "Excellent"
-                          : log.score >= 3
-                          ? "Passed"
-                          : "Needs Improvement"}
-                      </Badge>
-                    </TableCell>
+                    {isScorm ? (
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="border-green-500 text-green-700 bg-green-50"
+                        >
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                          Completed
+                        </Badge>
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>{`${log.score}/5`}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              log.score >= 4
+                                ? "border-green-500 text-green-700"
+                                : log.score >= 3
+                                ? "border-yellow-500 text-yellow-700"
+                                : "border-red-500 text-red-700"
+                            }
+                          >
+                            {log.score >= 4
+                              ? "Excellent"
+                              : log.score >= 3
+                              ? "Passed"
+                              : "Needs Improvement"}
+                          </Badge>
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
