@@ -25,13 +25,16 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
-import { ArrowLeft, Eye, Award, Store, FileText, BookOpen } from "lucide-react";
+import { ArrowLeft, Eye, Award, Store, FileText, BookOpen, Pencil } from "lucide-react";
 import type { Shop, LoyaltyLedgerEntry } from "@/types/database";
 
 interface InvoiceWithRelations {
@@ -73,6 +76,18 @@ export default function ShopDetailsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
+  // Edit shop dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    address: "",
+    phone: "",
+    steer_shop_id: "",
+    autoops_shop_id: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
   const fetchData = useCallback(async () => {
     const [shopRes, invoicesRes, ledgerRes] = await Promise.all([
       fetch(`/api/shops/${id}`),
@@ -107,6 +122,48 @@ export default function ShopDetailsPage() {
   const closePreview = () => {
     setPreviewInvoice(null);
     setPreviewUrl(null);
+  };
+
+  const openEdit = () => {
+    if (!shop) return;
+    setEditForm({
+      name: shop.name ?? "",
+      address: shop.address ?? "",
+      phone: shop.phone ?? "",
+      steer_shop_id: shop.steer_shop_id ?? "",
+      autoops_shop_id: shop.autoops_shop_id ?? "",
+    });
+    setEditError("");
+    setEditOpen(true);
+  };
+
+  const handleSaveShop = async () => {
+    setSaving(true);
+    setEditError("");
+
+    const res = await fetch(`/api/shops/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+
+    if (res.ok) {
+      setEditOpen(false);
+      fetchData();
+    } else {
+      const data = await res.json().catch(() => null);
+      const fieldError =
+        data?.error && typeof data.error === "object"
+          ? Object.values(data.error).flat().filter(Boolean).join(" ")
+          : null;
+      setEditError(
+        typeof data?.error === "string"
+          ? data.error
+          : fieldError ||
+              `Failed to save (${res.status}). Please check the fields and try again.`
+      );
+    }
+    setSaving(false);
   };
 
   if (!isAdmin) return <p>Unauthorized</p>;
@@ -184,8 +241,12 @@ export default function ShopDetailsPage() {
         {/* Tab 1: Shop Details */}
         <TabsContent value="details" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Shop Information</CardTitle>
+              <Button variant="outline" size="sm" onClick={openEdit}>
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
             </CardHeader>
             <CardContent>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -200,6 +261,18 @@ export default function ShopDetailsPage() {
                 <div>
                   <dt className="text-sm text-muted-foreground">Phone</dt>
                   <dd className="font-medium">{shop.phone || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Steer Shop ID</dt>
+                  <dd className="font-medium font-mono text-sm break-all">
+                    {shop.steer_shop_id || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">AutoOps Shop ID</dt>
+                  <dd className="font-medium font-mono text-sm break-all">
+                    {shop.autoops_shop_id || "—"}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-sm text-muted-foreground">Program Status</dt>
@@ -406,6 +479,91 @@ export default function ShopDetailsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Shop Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Shop Details</DialogTitle>
+            <DialogDescription>
+              Update the shop&apos;s contact information and platform cross-references.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="shop-name">Shop Name</Label>
+              <Input
+                id="shop-name"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shop-address">Shop Address</Label>
+              <Input
+                id="shop-address"
+                value={editForm.address}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, address: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shop-phone">Shop Phone</Label>
+              <Input
+                id="shop-phone"
+                value={editForm.phone}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, phone: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="steer-shop-id">Steer Shop ID</Label>
+              <Input
+                id="steer-shop-id"
+                placeholder="UUID from the Steer platform"
+                value={editForm.steer_shop_id}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, steer_shop_id: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="autoops-shop-id">AutoOps Shop ID</Label>
+              <Input
+                id="autoops-shop-id"
+                placeholder="ID from the AutoOps platform (e.g. cl_...)"
+                value={editForm.autoops_shop_id}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, autoops_shop_id: e.target.value })
+                }
+              />
+            </div>
+            {editError && (
+              <p className="text-sm text-red-600">{editError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveShop}
+              disabled={saving}
+              className="bg-exxon-red text-white hover:bg-exxon-red/90"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Invoice Preview Modal */}
       <Dialog open={!!previewInvoice} onOpenChange={(open) => { if (!open) closePreview(); }}>

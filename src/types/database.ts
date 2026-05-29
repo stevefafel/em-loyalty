@@ -8,6 +8,8 @@ export interface Shop {
   name: string;
   address: string | null;
   phone: string | null;
+  steer_shop_id: string | null;
+  autoops_shop_id: string | null;
   program_status: ProgramStatus;
   loyalty_points_balance: number;
   created_at: string;

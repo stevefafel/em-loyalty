@@ -39,6 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, X, FileText, Eye, Package } from "lucide-react";
 import { uploadTrainingPdf, getTrainingPdfUrl, uploadScormPackage } from "@/lib/supabase/storage";
+import { toast } from "sonner";
 import type { TrainingModule, QuizQuestion, TrainingContentType } from "@/types/database";
 
 const emptyQuestion: QuizQuestion = {
@@ -172,6 +173,12 @@ export default function AdminTrainingPage() {
     });
 
     if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.collection) {
+        toast.success(
+          `Created ${data.count} training module${data.count === 1 ? "" : "s"} from the course bundle.`
+        );
+      }
       setDialogOpen(false);
       resetForm();
       fetchModules();
@@ -425,7 +432,10 @@ export default function AdminTrainingPage() {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Upload a SCORM 1.2 or 2004 compliant .zip package
+                  Upload a SCORM 1.2 or 2004 compliant .zip package. You can also
+                  upload a bundle .zip containing multiple course packages — each
+                  course will be created as its own module (the Title field is
+                  ignored for bundles).
                 </p>
               </div>
             )}

@@ -2,6 +2,69 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { createTrainingModuleSchema } from "@/lib/validators/training-module";
+import { createAdminClient } from "@/lib/supabase/server";
+import { STORAGE_BUCKETS } from "@/lib/constants";
+import { isScormCollection, extractScormCourses } from "@/lib/scorm";
+import JSZip from "jszip";
+
+/**
+ * If the uploaded SCORM zip is a collection (a bundle of individual course
+ * zips), split it into one module per course and remove the original bundle.
+ * Returns the created modules, or null if the upload was a normal single
+ * package and should be handled by the default create path.
+ */
+async function handleScormCollection(
+  scormPath: string,
+  description?: string | null
+) {
+  const supabase = createAdminClient();
+  const bucket = STORAGE_BUCKETS.SCORM_PACKAGES;
+
+  const { data: blob, error } = await supabase.storage
+    .from(bucket)
+    .download(scormPath);
+  if (error || !blob) {
+    throw new Error("Failed to download uploaded SCORM package");
+  }
+
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  if (!isScormCollection(zip)) return null;
+
+  const courses = await extractScormCourses(zip);
+  if (courses.length === 0) return null;
+
+  const created = [];
+  for (let i = 0; i < courses.length; i++) {
+    const course = courses[i];
+    const path = `packages/${Date.now()}_${i}_${course.filename}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(path, course.buffer, {
+        contentType: "application/zip",
+        upsert: false,
+      });
+    if (uploadError) {
+      throw new Error(`Failed to store course "${course.title}"`);
+    }
+
+    const mod = await prisma.trainingModule.create({
+      data: {
+        title: course.title,
+        description: description || null,
+        content_type: "scorm",
+        scorm_path: path,
+        questions: [],
+      },
+    });
+    created.push(mod);
+  }
+
+  // Remove the original bundle so it isn't left as an unusable package.
+  await supabase.storage.from(bucket).remove([scormPath]);
+
+  return created;
+}
 
 export async function GET() {
   try {
@@ -38,6 +101,31 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
+
+  // SCORM uploads may be a "collection" bundle of several course packages.
+  // Split those into one module per course before normal validation, since
+  // the bundle has no single title of its own.
+  if (body.content_type === "scorm" && body.scorm_path) {
+    try {
+      const created = await handleScormCollection(
+        body.scorm_path,
+        body.description
+      );
+      if (created) {
+        return NextResponse.json(
+          { data: created, count: created.length, collection: true },
+          { status: 201 }
+        );
+      }
+    } catch (err) {
+      console.error("SCORM collection split failed:", err);
+      return NextResponse.json(
+        { error: "Failed to process SCORM package bundle." },
+        { status: 500 }
+      );
+    }
+  }
+
   const parsed = createTrainingModuleSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

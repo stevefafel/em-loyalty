@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import type { ProgramStatus } from "@/generated/prisma/client";
+import { shopUpdateSchema } from "@/lib/validators/shop";
 
 export async function GET(
   req: NextRequest,
@@ -35,15 +35,43 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
-  const data = await prisma.shop.update({
-    where: { id },
-    data: {
-      ...(body.program_status
-        ? { program_status: body.program_status as ProgramStatus }
-        : {}),
-      updated_at: new Date(),
-    },
-  });
+  const parsed = shopUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
 
-  return NextResponse.json({ data });
+  // Only apply fields the client actually sent.
+  const updateData = Object.fromEntries(
+    Object.entries(parsed.data).filter(([, v]) => v !== undefined)
+  );
+
+  try {
+    const data = await prisma.shop.update({
+      where: { id },
+      data: {
+        ...updateData,
+        updated_at: new Date(),
+      },
+    });
+    return NextResponse.json({ data });
+  } catch (err: unknown) {
+    // Unique constraint violation on a cross-reference ID
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2002"
+    ) {
+      const target = (err as { meta?: { target?: string[] } }).meta?.target;
+      const field = Array.isArray(target) ? target[0] : "value";
+      return NextResponse.json(
+        { error: `That ${field} is already linked to another shop.` },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 }

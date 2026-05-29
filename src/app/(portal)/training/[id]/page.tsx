@@ -105,7 +105,9 @@ export default function TrainingModulePage() {
   const allAnswered = answers.every((a) => a >= 0);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div
+      className={`space-y-6 mx-auto ${isScorm ? "max-w-6xl" : "max-w-3xl"}`}
+    >
       <div>
         <h1 className="text-3xl font-bold text-exxon-charcoal">
           {module.title}

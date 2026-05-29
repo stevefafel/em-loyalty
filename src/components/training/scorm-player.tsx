@@ -127,7 +127,7 @@ export function ScormPlayer({ moduleId, onComplete }: ScormPlayerProps) {
       <iframe
         ref={iframeRef}
         src={scormUrl}
-        className="w-full h-[600px]"
+        className="w-full h-[80vh] min-h-[640px]"
         title="SCORM Training Content"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
       />
