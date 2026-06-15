@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 interface ScormPlayerProps {
   moduleId: string;
@@ -17,6 +18,7 @@ interface ScormPlayerProps {
 export function ScormPlayer({ moduleId, onComplete }: ScormPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const completedRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleCompletion = useCallback(
     (score: number) => {
@@ -123,10 +125,17 @@ export function ScormPlayer({ moduleId, onComplete }: ScormPlayerProps) {
   const scormUrl = `/api/training/${moduleId}/scorm?file=index.html`;
 
   return (
-    <div className="w-full rounded-lg border bg-white overflow-hidden">
+    <div className="relative w-full rounded-lg border bg-white overflow-hidden">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white">
+          <Loader2 className="h-8 w-8 animate-spin text-exxon-red" />
+          <p className="text-sm text-muted-foreground">Loading training…</p>
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         src={scormUrl}
+        onLoad={() => setIsLoading(false)}
         className="w-full h-[80vh] min-h-[640px]"
         title="SCORM Training Content"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
