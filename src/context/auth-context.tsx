@@ -14,7 +14,6 @@ interface AuthState {
   session: MockSession | null;
   isAdmin: boolean;
   isLoading: boolean;
-  login: (userId: string, shopId?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -31,25 +30,14 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<User | null>(initialUser);
   const [session, setSession] = useState<MockSession | null>(initialSession);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const login = async (userId: string, shopId?: string) => {
-    setIsLoading(true);
-    const res = await fetch("/api/auth/mock", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, shopId }),
-    });
-    const { data } = await res.json();
-    setUser(data.user);
-    setSession(data.session);
-    setIsLoading(false);
-  };
+  const [isLoading] = useState(false);
 
   const logout = async () => {
-    await fetch("/api/auth/mock", { method: "DELETE" });
     setUser(null);
     setSession(null);
+    // Full navigation to the server logout route, which clears the sealed
+    // session cookie and (in Keycloak mode) ends the Keycloak SSO session.
+    window.location.href = "/api/auth/logout";
   };
 
   return (
@@ -59,7 +47,6 @@ export function AuthProvider({
         session,
         isAdmin: session?.role === "admin",
         isLoading,
-        login,
         logout,
       }}
     >

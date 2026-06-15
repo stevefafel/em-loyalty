@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/context/auth-context";
 import { useShop } from "@/context/shop-context";
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShopSwitcher } from "./shop-switcher";
@@ -11,12 +10,11 @@ import { LogOut, CalendarDays, Bell } from "lucide-react";
 export function Header() {
   const { user, isAdmin, logout } = useAuth();
   const { activeShop } = useShop();
-  const router = useRouter();
 
   const handleLogout = async () => {
+    // logout() performs a full-page navigation to the server logout route,
+    // which clears the session and redirects — no client-side push needed.
     await logout();
-    router.push("/login");
-    router.refresh();
   };
 
   const statusColor =

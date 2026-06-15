@@ -117,7 +117,7 @@ function ShopDashboard() {
     count: b.count,
   }));
   const pegasusThreshold = PEGASUS_THRESHOLD;
-  const { inPegasus, monthsToGo, consecutive } = computePegasusStatus(pegasusBuckets);
+  const { inPegasus, consecutive } = computePegasusStatus(pegasusBuckets);
   const currentMonthOilChanges =
     pegasusBuckets.find((b) => b.isCurrent)?.count ?? 0;
   const pegasusBarMax = Math.max(
@@ -263,28 +263,21 @@ function ShopDashboard() {
       {/* Pegasus Status Tracker */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold">Pegasus Status Tracker</CardTitle>
-            <span className="text-base font-semibold text-muted-foreground">
-              {inPegasus
-                ? "Pegasus Status achieved!"
-                : `${monthsToGo} more month${monthsToGo !== 1 ? "s" : ""} to Pegasus Status`}
-            </span>
-          </div>
+          <CardTitle className="text-lg font-bold">Pegasus Status Tracker</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.75fr_0.5fr_0.75fr] gap-6 lg:gap-0 lg:divide-x divide-gray-200 lg:items-stretch">
             {/* Current-month gauge */}
-            <div className="flex flex-col items-center justify-center text-center lg:px-6 w-full">
+            <div className="flex flex-col items-center justify-start text-center lg:px-6 w-full">
               <p className="text-sm font-bold text-exxon-charcoal leading-tight">
                 Mobil 1 Oil Changes
               </p>
               <p className="text-sm font-bold text-exxon-charcoal leading-tight">
                 (Current Month)
               </p>
-              <div className="mt-6 relative w-full max-w-[200px]">
+              <div className="mt-16 relative w-full max-w-[200px]">
                 <span
-                  className="absolute -top-5 -translate-x-1/2 text-base font-bold text-exxon-charcoal"
+                  className="absolute -top-8 -translate-x-1/2 text-base font-bold text-exxon-charcoal"
                   style={{ left: `${gaugePct}%` }}
                 >
                   {currentMonthOilChanges}
@@ -354,6 +347,16 @@ function ShopDashboard() {
 
             {/* Big Pegasus Status icon with progress indicator */}
             <div className="flex flex-col items-center justify-center lg:px-6">
+              {inPegasus && (
+                <div className="flex flex-col items-center mb-4">
+                  <span className="text-sm font-semibold text-green-700 text-center leading-tight">
+                    Pegasus Mode Enabled
+                  </span>
+                  <div className="bg-green-500 rounded-full p-1 shadow-md ring-2 ring-white mt-1">
+                    <Check className="h-4 w-4 text-white" strokeWidth={3} />
+                  </div>
+                </div>
+              )}
               <div className="relative">
                 <Image
                   src="/Mobil_Pegasus_red_RGB-TM.png"
@@ -361,11 +364,6 @@ function ShopDashboard() {
                   width={80}
                   height={80}
                 />
-                {inPegasus && (
-                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 shadow-md ring-2 ring-white">
-                    <Check className="h-4 w-4 text-white" strokeWidth={3} />
-                  </div>
-                )}
               </div>
               <div className="border-t-2 border-exxon-charcoal w-24 mt-2" />
               <span className="text-sm font-bold text-exxon-charcoal mt-1 text-center leading-tight">
@@ -386,7 +384,7 @@ function ShopDashboard() {
                   inPegasus ? "text-green-700" : "text-muted-foreground"
                 }`}
               >
-                {inPegasus ? "Achieved" : `${consecutive} of 3 months`}
+                {inPegasus ? "3 months in a row!" : `${consecutive} of 3 months`}
               </span>
             </div>
 

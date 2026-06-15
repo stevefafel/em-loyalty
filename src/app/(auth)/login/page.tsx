@@ -1,28 +1,36 @@
 import { prisma } from "@/lib/prisma";
+import { authMode } from "@/lib/auth/config";
 import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const users = await prisma.user.findMany({
-    select: { id: true, email: true, name: true, role: true },
-    orderBy: { role: "asc" },
-  });
+  const keycloak = authMode === "keycloak";
 
-  const userShops = await prisma.userShop.findMany({
-    include: {
-      shop: { select: { id: true, name: true, program_status: true } },
-    },
-  });
-
-  const shopsByUser: Record<
+  // Only query users/shops for the mock picker; keycloak mode needs no DB.
+  let users: { id: string; email: string; name: string; role: string }[] = [];
+  let shopsByUser: Record<
     string,
     { id: string; name: string; program_status: string }[]
   > = {};
 
-  for (const us of userShops) {
-    if (!shopsByUser[us.user_id]) shopsByUser[us.user_id] = [];
-    if (us.shop) shopsByUser[us.user_id].push(us.shop);
+  if (!keycloak) {
+    users = await prisma.user.findMany({
+      select: { id: true, email: true, name: true, role: true },
+      orderBy: { role: "asc" },
+    });
+
+    const userShops = await prisma.userShop.findMany({
+      include: {
+        shop: { select: { id: true, name: true, program_status: true } },
+      },
+    });
+
+    shopsByUser = {};
+    for (const us of userShops) {
+      if (!shopsByUser[us.user_id]) shopsByUser[us.user_id] = [];
+      if (us.shop) shopsByUser[us.user_id].push(us.shop);
+    }
   }
 
   return (
@@ -41,19 +49,28 @@ export default async function LoginPage() {
       <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-2xl relative z-10">
         <div className="flex flex-col items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/mobil1-logo.svg"
-            alt="Mobil 1"
-            className="h-12"
-          />
+          <img src="/mobil1-logo.svg" alt="Mobil 1" className="h-12" />
           <h1 className="text-2xl font-bold text-exxon-charcoal">
             Premium Growth Program
           </h1>
           <p className="text-sm text-exxon-gray">
-            Select a user to sign in (POC mock auth)
+            {keycloak
+              ? "Sign in with your Steer account to continue"
+              : "Select a user to sign in (POC mock auth)"}
           </p>
         </div>
-        <LoginForm users={users || []} shopsByUser={shopsByUser} />
+
+        {keycloak ? (
+          <a
+            href="/api/auth/login"
+            className="block w-full rounded-md bg-exxon-red px-4 py-2 text-center font-semibold text-white hover:bg-exxon-red-dark"
+          >
+            Sign in with Keycloak
+          </a>
+        ) : (
+          <LoginForm users={users} shopsByUser={shopsByUser} />
+        )}
+
         {/* Footer branding */}
         <div className="flex justify-center pt-2 opacity-20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
