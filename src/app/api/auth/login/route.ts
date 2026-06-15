@@ -3,17 +3,16 @@ import { keycloakRedirectUri } from "@/lib/auth/config";
 import {
   client,
   getOidcConfig,
-  TXN_NONCE,
-  TXN_STATE,
-  TXN_VERIFIER,
+  txnCookieName,
   txnCookieOptions,
 } from "@/lib/auth/oidc";
 
 /**
  * Begin the OIDC Authorization Code + PKCE flow.
  *
- * Generates the PKCE verifier, state, and nonce, stashes them in short-lived
- * httpOnly transaction cookies, and redirects to Keycloak's authorize endpoint.
+ * Generates the PKCE verifier, state, and nonce, stashes the verifier+nonce in
+ * a short-lived httpOnly cookie keyed by `state` (so concurrent logins don't
+ * clobber each other), and redirects to Keycloak's authorize endpoint.
  * Node runtime only.
  */
 export async function GET(req: NextRequest) {
@@ -40,9 +39,10 @@ export async function GET(req: NextRequest) {
   });
 
   const response = NextResponse.redirect(authUrl);
-  const opts = txnCookieOptions();
-  response.cookies.set(TXN_VERIFIER, codeVerifier, opts);
-  response.cookies.set(TXN_STATE, state, opts);
-  response.cookies.set(TXN_NONCE, nonce, opts);
+  response.cookies.set(
+    txnCookieName(state),
+    JSON.stringify({ verifier: codeVerifier, nonce }),
+    txnCookieOptions(),
+  );
   return response;
 }

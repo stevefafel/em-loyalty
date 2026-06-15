@@ -25,18 +25,17 @@ vi.mock("next/headers", () => ({
 
 vi.mock("@/lib/auth/oidc", () => ({
   getOidcConfig: async () => ({}),
-  clearTxnCookies: () => {},
-  TXN_VERIFIER: "oidc_verifier",
-  TXN_STATE: "oidc_state",
-  TXN_NONCE: "oidc_nonce",
+  clearTxnCookie: () => {},
+  txnCookieName: (state: string) => `oidc_txn_${state}`,
   client: {
     authorizationCodeGrant: (...a: unknown[]) => grant(...a),
     buildEndSessionUrl: (...a: unknown[]) => buildEndSessionUrl(...a),
   },
 }));
 
-function fullTxn() {
-  cookieJar = { oidc_verifier: "v", oidc_state: "s", oidc_nonce: "n" };
+// Valid per-state transaction cookie for state "s".
+function validTxn() {
+  cookieJar = { oidc_txn_s: JSON.stringify({ verifier: "v", nonce: "n" }) };
 }
 
 async function loadRoute() {
@@ -54,13 +53,13 @@ beforeEach(() => {
   findShops.mockReset().mockResolvedValue([]);
   grant.mockReset();
   buildEndSessionUrl.mockReset();
-  fullTxn();
+  validTxn();
 });
 afterEach(() => vi.resetModules());
 
 describe("callback route", () => {
-  it("redirects /login?error=state when the nonce cookie is missing (fail closed)", async () => {
-    cookieJar = { oidc_verifier: "v", oidc_state: "s" }; // no nonce
+  it("redirects /login?error=state when the transaction cookie is missing (fail closed)", async () => {
+    cookieJar = {}; // no oidc_txn_s
     const { GET } = await loadRoute();
     const res = await GET(req());
     expect(res.headers.get("location")).toContain("/login?error=state");
@@ -86,7 +85,6 @@ describe("callback route", () => {
     const { GET } = await loadRoute();
     const res = await GET(req());
     expect(buildEndSessionUrl).toHaveBeenCalled();
-    // post_logout_redirect_uri must point back to /access-denied
     expect(buildEndSessionUrl.mock.calls[0][1].post_logout_redirect_uri).toContain(
       "/access-denied",
     );

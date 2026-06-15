@@ -4,11 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { sealSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 import {
   client,
-  clearTxnCookies,
+  clearTxnCookie,
   getOidcConfig,
-  TXN_NONCE,
-  TXN_STATE,
-  TXN_VERIFIER,
+  txnCookieName,
+  type TxnData,
 } from "@/lib/auth/oidc";
 import { mapIdentity, normalizeEmail } from "./mapping";
 
@@ -23,19 +22,34 @@ export async function GET(req: NextRequest) {
   try {
     config = await getOidcConfig();
   } catch {
-    return clearTxnAnd(NextResponse.redirect(new URL("/login?error=unavailable", req.url)));
+    // No state read yet — nothing to clear; the txn cookie self-expires (10 min).
+    return NextResponse.redirect(new URL("/login?error=unavailable", req.url));
   }
 
-  const jar = await cookies();
-  const verifier = jar.get(TXN_VERIFIER)?.value;
-  const state = jar.get(TXN_STATE)?.value;
-  const nonce = jar.get(TXN_NONCE)?.value;
+  // The login's state is echoed back as a query param; it names the per-login
+  // transaction cookie holding that login's PKCE verifier + nonce.
+  const state = req.nextUrl.searchParams.get("state");
+  if (!state) {
+    return NextResponse.redirect(new URL("/login?error=state", req.url));
+  }
 
   const redirectTo = (path: string) =>
-    clearTxnAnd(NextResponse.redirect(new URL(path, req.url)));
+    clearTxnAnd(NextResponse.redirect(new URL(path, req.url)), state);
 
-  // Fail closed: a missing nonce would otherwise skip ID-token nonce validation.
-  if (!verifier || !state || !nonce) return redirectTo("/login?error=state");
+  const jar = await cookies();
+  const rawTxn = jar.get(txnCookieName(state))?.value;
+  let txn: TxnData | null = null;
+  if (rawTxn) {
+    try {
+      txn = JSON.parse(rawTxn) as TxnData;
+    } catch {
+      txn = null;
+    }
+  }
+
+  // Fail closed: a missing verifier/nonce would otherwise skip PKCE/nonce validation.
+  if (!txn?.verifier || !txn?.nonce) return redirectTo("/login?error=state");
+  const { verifier, nonce } = txn;
 
   let tokens;
   try {
@@ -87,7 +101,7 @@ export async function GET(req: NextRequest) {
           post_logout_redirect_uri: new URL("/access-denied", req.url).toString(),
           id_token_hint: tokens.id_token,
         });
-        return clearTxnAnd(NextResponse.redirect(endSession));
+        return clearTxnAnd(NextResponse.redirect(endSession), state);
       } catch {
         return redirectTo("/access-denied");
       }
@@ -107,7 +121,7 @@ export async function GET(req: NextRequest) {
   return response;
 }
 
-function clearTxnAnd(res: NextResponse): NextResponse {
-  clearTxnCookies(res);
+function clearTxnAnd(res: NextResponse, state: string): NextResponse {
+  clearTxnCookie(res, state);
   return res;
 }
