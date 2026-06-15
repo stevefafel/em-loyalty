@@ -74,4 +74,28 @@ describe("session seal/decode", () => {
       .encrypt(key(OTHER_SECRET_B64));
     expect(await decodeSession(foreign)).toBeNull();
   });
+
+  it("preserves a provided expiresAt instead of extending the TTL (re-seal)", async () => {
+    const { sealSession, decodeSession } = await load();
+    const fixed = Math.floor(Date.now() / 1000) + 120; // 2 min from now
+    const sealed = await sealSession({
+      userId: "u1",
+      role: "user",
+      shopId: "s1",
+      expiresAt: fixed,
+    });
+    expect((await decodeSession(sealed))?.expiresAt).toBe(fixed);
+  });
+
+  it("throws when the sealed cookie would exceed the size budget", async () => {
+    const { sealSession } = await load();
+    await expect(
+      sealSession({
+        userId: "u1",
+        role: "user",
+        shopId: "s1",
+        idToken: "x".repeat(5000), // oversized idToken
+      }),
+    ).rejects.toThrow(/cookie budget/);
+  });
 });

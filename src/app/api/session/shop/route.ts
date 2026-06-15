@@ -21,31 +21,33 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   const body = (await req.json().catch(() => ({}))) as { shopId?: unknown };
   const shopId = body.shopId;
 
   let isMember = false;
-  if (session && typeof shopId === "string" && shopId.length > 0) {
+  if (typeof shopId === "string" && shopId.length > 0) {
     const membership = await prisma.userShop.findUnique({
       where: { user_id_shop_id: { user_id: session.userId, shop_id: shopId } },
     });
     isMember = membership !== null;
   }
 
-  const result = evaluateShopSwitch({
-    authenticated: session !== null,
-    shopId,
-    isMember,
-  });
+  const result = evaluateShopSwitch({ authenticated: true, shopId, isMember });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
   const sealed = await sealSession({
-    userId: session!.userId,
-    role: session!.role,
+    userId: session.userId,
+    role: session.role,
     shopId: shopId as string,
-    idToken: session!.idToken,
+    idToken: session.idToken,
+    // Preserve the original expiry — re-sealing must not extend the 8h ceiling.
+    expiresAt: session.expiresAt,
   });
 
   const response = NextResponse.json({ data: { shopId } });

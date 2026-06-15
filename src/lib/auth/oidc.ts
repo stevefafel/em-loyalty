@@ -1,5 +1,6 @@
 import * as client from "openid-client";
 import {
+  cookieSecure,
   keycloakBaseUrl,
   keycloakClientId,
   keycloakClientSecret,
@@ -47,7 +48,7 @@ export const TXN_NONCE = "oidc_nonce";
 export function txnCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: 600, // 10 minutes — the login round-trip window

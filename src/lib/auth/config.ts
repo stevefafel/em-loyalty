@@ -45,11 +45,22 @@ export const keycloakPostLogoutUri = (): string =>
   required("KEYCLOAK_POST_LOGOUT_URI");
 
 /**
+ * Whether cookies should carry the Secure flag. Keyed off the same APP_ENV
+ * signal as auth gating (not NODE_ENV) so any non-local environment transmits
+ * cookies only over HTTPS, even if NODE_ENV is misconfigured. Local dev over
+ * http stays non-secure.
+ */
+export const cookieSecure = (): boolean => appEnv !== "local";
+
+/**
  * The 256-bit key used to seal the session cookie (jose `dir`/A256GCM).
  * Must decode to exactly 32 bytes — validated here so a misconfigured secret
  * fails loudly at first use rather than silently producing unreadable sessions.
+ * Cached after first validation to avoid re-parsing on every seal/unseal.
  */
+let cachedKey: Uint8Array | null = null;
 export function sessionSecretKey(): Uint8Array {
+  if (cachedKey) return cachedKey;
   const raw = required("SESSION_SECRET");
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) {
@@ -58,7 +69,8 @@ export function sessionSecretKey(): Uint8Array {
         `Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`,
     );
   }
-  return new Uint8Array(key);
+  cachedKey = new Uint8Array(key);
+  return cachedKey;
 }
 
 /** Fixed application session lifetime (KTD-8). */

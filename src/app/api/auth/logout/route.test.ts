@@ -60,4 +60,11 @@ describe("logout route", () => {
     const res = await GET(req());
     expect(res.headers.get("location")).toContain("/login");
   });
+
+  it("redirects /login and clears the cookie when there is no session", async () => {
+    const { GET } = await loadLogout({ mode: "keycloak", session: null });
+    const res = await GET(req());
+    expect(res.headers.get("location")).toContain("/login");
+    expect(res.headers.get("set-cookie") ?? "").toContain("session=");
+  });
 });

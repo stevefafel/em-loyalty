@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { keycloakRedirectUri } from "@/lib/auth/config";
 import {
   client,
@@ -16,8 +16,14 @@ import {
  * httpOnly transaction cookies, and redirects to Keycloak's authorize endpoint.
  * Node runtime only.
  */
-export async function GET() {
-  const config = await getOidcConfig();
+export async function GET(req: NextRequest) {
+  let config;
+  try {
+    config = await getOidcConfig();
+  } catch {
+    // Keycloak unreachable / discovery failed — fail gracefully, not a 500.
+    return NextResponse.redirect(new URL("/login?error=unavailable", req.url));
+  }
 
   const codeVerifier = client.randomPKCECodeVerifier();
   const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);

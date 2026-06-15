@@ -13,17 +13,21 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   const idToken = session?.idToken;
 
-  let destination: URL;
-  if (authMode === "mock" || !idToken) {
-    destination = new URL("/login", req.url);
-  } else {
-    const config = await getOidcConfig();
-    destination = client.buildEndSessionUrl(config, {
-      post_logout_redirect_uri: keycloakPostLogoutUri(),
-      id_token_hint: idToken,
-    });
+  let destination: URL = new URL("/login", req.url);
+  if (authMode !== "mock" && idToken) {
+    try {
+      const config = await getOidcConfig();
+      destination = client.buildEndSessionUrl(config, {
+        post_logout_redirect_uri: keycloakPostLogoutUri(),
+        id_token_hint: idToken,
+      });
+    } catch {
+      // Keycloak unreachable — still clear the local session and land on /login.
+      destination = new URL("/login", req.url);
+    }
   }
 
+  // Always clear the local session cookie, regardless of Keycloak reachability.
   const response = NextResponse.redirect(destination);
   response.cookies.delete(SESSION_COOKIE);
   return response;

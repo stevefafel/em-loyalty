@@ -77,9 +77,17 @@ export default async function PortalLayout({
     if (data) activeShop = serialize<Shop>(data as unknown as Record<string, unknown>);
   }
 
+  // Project to the public session shape before crossing into the client
+  // AuthProvider — never hand the sealed session's idToken (PII) to the browser.
+  const clientSession = {
+    userId: session.userId,
+    role: session.role,
+    shopId: session.shopId,
+  };
+
   return (
     <AuthProvider
-      initialSession={session}
+      initialSession={clientSession}
       initialUser={serialize<User>(user as unknown as Record<string, unknown>)}
     >
       <ShopProvider initialShop={activeShop} initialShops={shops}>

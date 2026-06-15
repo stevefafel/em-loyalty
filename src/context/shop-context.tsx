@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import type { Shop } from "@/types/database";
 
 interface ShopState {
   activeShop: Shop | null;
   shops: Shop[];
-  setActiveShop: (shop: Shop) => Promise<void>;
+  /** Returns true when the switch succeeded (session re-sealed server-side). */
+  setActiveShop: (shop: Shop) => Promise<boolean>;
   setShops: (shops: Shop[]) => void;
 }
 
@@ -27,14 +29,22 @@ export function ShopProvider({
   // The session cookie is httpOnly and sealed server-side, so the active shop
   // must be changed via a server route that re-seals it. Await the round-trip
   // before the caller refreshes, or the server re-renders the stale shop.
-  const setActiveShop = async (shop: Shop) => {
-    const res = await fetch("/api/session/shop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopId: shop.id }),
-    });
-    if (res.ok) {
+  const setActiveShop = async (shop: Shop): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/session/shop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: shop.id }),
+      });
+      if (!res.ok) {
+        toast.error("Could not switch shop. Please try again.");
+        return false;
+      }
       setActiveShopState(shop);
+      return true;
+    } catch {
+      toast.error("Could not switch shop. Please try again.");
+      return false;
     }
   };
 

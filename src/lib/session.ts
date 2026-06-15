@@ -1,7 +1,14 @@
 import { cookies } from "next/headers";
 import { EncryptJWT, jwtDecrypt } from "jose";
 import type { MockSession } from "@/types/api";
-import { SESSION_TTL_SECONDS, sessionSecretKey } from "@/lib/auth/config";
+import { cookieSecure, SESSION_TTL_SECONDS, sessionSecretKey } from "@/lib/auth/config";
+
+/**
+ * Browsers silently drop cookies over ~4KB. The sealed session carries the
+ * Keycloak idToken (a JWT with PII claims), so guard against overflow at seal
+ * time — a thrown error is far easier to diagnose than "random" lost sessions.
+ */
+const MAX_SEALED_COOKIE_BYTES = 3800;
 
 /**
  * Sealed (encrypted) session.
@@ -28,12 +35,19 @@ export interface SessionInput {
   role: MockSession["role"];
   shopId: string | null;
   idToken?: string;
+  /**
+   * Absolute expiry (unix seconds) to preserve across a re-seal. Omit when
+   * minting a fresh session (login/callback/mock) to start a new 8h window;
+   * pass the existing session.expiresAt on re-seal (e.g. shop switch) so the
+   * fixed TTL ceiling (KTD-8) is not extended on every mutation.
+   */
+  expiresAt?: number;
 }
 
 export function sessionCookieOptions(maxAgeSeconds = SESSION_TTL_SECONDS) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     sameSite: "lax" as const,
     path: "/",
     maxAge: maxAgeSeconds,
@@ -45,7 +59,8 @@ export function sessionCookieOptions(maxAgeSeconds = SESSION_TTL_SECONDS) {
  * explicit `expiresAt` (belt-and-suspenders TTL enforcement in getSession).
  */
 export async function sealSession(input: SessionInput): Promise<string> {
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const expiresAt =
+    input.expiresAt ?? Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   const payload: SessionData = {
     userId: input.userId,
     role: input.role,
@@ -53,11 +68,18 @@ export async function sealSession(input: SessionInput): Promise<string> {
     expiresAt,
     ...(input.idToken ? { idToken: input.idToken } : {}),
   };
-  return new EncryptJWT({ ...payload })
+  const sealed = await new EncryptJWT({ ...payload })
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setIssuedAt()
     .setExpirationTime(expiresAt)
     .encrypt(sessionSecretKey());
+  if (sealed.length > MAX_SEALED_COOKIE_BYTES) {
+    throw new Error(
+      `Sealed session (${sealed.length} bytes) exceeds the ${MAX_SEALED_COOKIE_BYTES}-byte ` +
+        `cookie budget — the Keycloak idToken is likely too large. Move tokens to a server-side store.`,
+    );
+  }
+  return sealed;
 }
 
 /** Decrypt and validate a sealed session string. Returns null on any failure. */
