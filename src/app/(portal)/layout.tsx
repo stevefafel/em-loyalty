@@ -42,8 +42,31 @@ export default async function PortalLayout({
     shops = data.map((s) => serialize<Shop>(s as unknown as Record<string, unknown>));
   }
 
-  // For shop users, must have active shop
-  if (user.role === "user" && !session.shopId) redirect("/login");
+  // Shop users need an active shop. Both the Keycloak callback and the mock
+  // login set one when the user has at least one shop, so reaching here without
+  // a shopId means the user has no shop assigned at all. Render a terminal state
+  // rather than redirecting to /login — under Keycloak that would re-authenticate
+  // the same account and bounce straight back (an infinite loop).
+  if (user.role === "user" && !session.shopId) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center bg-exxon-charcoal">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-exxon-red" />
+        <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-8 text-center shadow-2xl">
+          <h1 className="text-2xl font-bold text-exxon-charcoal">No shop assigned</h1>
+          <p className="text-sm text-exxon-gray">
+            Your account isn&apos;t associated with any shop yet. Please contact
+            your administrator to be added to a shop.
+          </p>
+          <a
+            href="/api/auth/logout"
+            className="inline-block w-full rounded-md bg-exxon-red px-4 py-2 text-white hover:bg-exxon-red-dark"
+          >
+            Sign out
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   // Get active shop
   let activeShop: Shop | null = null;
