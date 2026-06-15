@@ -29,8 +29,8 @@ export function ShopSwitcher() {
         {shops.map((shop) => (
           <DropdownMenuItem
             key={shop.id}
-            onClick={() => {
-              setActiveShop(shop);
+            onClick={async () => {
+              await setActiveShop(shop);
               router.refresh();
             }}
             className="gap-2"
