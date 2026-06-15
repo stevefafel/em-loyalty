@@ -47,9 +47,11 @@ export function AuthProvider({
   };
 
   const logout = async () => {
-    await fetch("/api/auth/mock", { method: "DELETE" });
     setUser(null);
     setSession(null);
+    // Full navigation to the server logout route, which clears the sealed
+    // session cookie and (in Keycloak mode) ends the Keycloak SSO session.
+    window.location.href = "/api/auth/logout";
   };
 
   return (
