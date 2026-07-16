@@ -65,7 +65,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex w-60 flex-col border-r border-gray-200 bg-white shrink-0">
+    <aside className="flex h-full w-60 flex-col overflow-y-auto border-r border-gray-200 bg-white shrink-0">
       {/* Branding header — stacked M1 logo + program name with extra spacing */}
       <div className="flex flex-col items-center gap-5 border-b border-gray-200 px-5 py-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -76,21 +76,22 @@ export function Sidebar() {
       </div>
 
       {/* Main navigation */}
-      <nav className="flex-1 space-y-0.5 px-3 py-3">
+      <nav aria-label="Main" className="flex-1 space-y-0.5 px-3 py-3">
         {links.map((link) => {
           const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
           return (
             <Link
               key={link.href}
               href={link.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-exxon-blue",
                 isActive
                   ? "border-l-3 border-exxon-red bg-red-50 text-exxon-red"
                   : "text-exxon-charcoal/70 hover:bg-gray-50 hover:text-exxon-charcoal"
               )}
             >
-              <link.icon className="h-4.5 w-4.5" />
+              <link.icon aria-hidden="true" className="h-4.5 w-4.5" />
               {link.label}
             </Link>
           );
@@ -105,12 +106,15 @@ export function Sidebar() {
             href={partner.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-exxon-charcoal/70 hover:bg-gray-50 hover:text-exxon-charcoal transition-colors"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-exxon-charcoal/70 hover:bg-gray-50 hover:text-exxon-charcoal transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-exxon-blue"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={partner.logo} alt="" className="h-4 w-4 object-contain" />
-            <span className="flex-1">{partner.label}</span>
-            <ExternalLink className="h-3.5 w-3.5 opacity-50" />
+            <span className="flex-1">
+              {partner.label}
+              <span className="sr-only"> (opens in new tab)</span>
+            </span>
+            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5 opacity-50" />
           </a>
         ))}
 

@@ -115,7 +115,10 @@ export default function AdminShopsPage() {
                           handleStatusChange(shop.id, val)
                         }
                       >
-                        <SelectTrigger className="w-[130px]">
+                        <SelectTrigger
+                          className="w-[130px]"
+                          aria-label={`Change status for ${shop.name}`}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

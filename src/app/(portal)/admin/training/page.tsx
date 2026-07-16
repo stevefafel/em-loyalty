@@ -319,6 +319,7 @@ export default function AdminTrainingPage() {
                             variant="outline"
                             className="text-exxon-blue hover:text-exxon-blue hover:bg-blue-50"
                             onClick={() => setPreviewTarget(mod)}
+                            aria-label={`Preview ${mod.title}`}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -327,6 +328,7 @@ export default function AdminTrainingPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => openEdit(mod)}
+                          aria-label={`Edit ${mod.title}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -335,6 +337,7 @@ export default function AdminTrainingPage() {
                           variant="outline"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => setDeleteTarget(mod)}
+                          aria-label={`Delete ${mod.title}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -390,7 +393,7 @@ export default function AdminTrainingPage() {
                 value={contentType}
                 onValueChange={(val) => setContentType(val as TrainingContentType)}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Content type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -456,8 +459,9 @@ export default function AdminTrainingPage() {
                 <Card key={qIdx} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 space-y-2">
-                      <Label>Question {qIdx + 1}</Label>
+                      <Label htmlFor={`question-${qIdx}`}>Question {qIdx + 1}</Label>
                       <Input
+                        id={`question-${qIdx}`}
                         value={q.question}
                         onChange={(e) => updateQuestion(qIdx, "question", e.target.value)}
                         placeholder="Enter question text"
@@ -469,6 +473,7 @@ export default function AdminTrainingPage() {
                       variant="ghost"
                       className="text-red-500 mt-6"
                       onClick={() => removeQuestion(qIdx)}
+                      aria-label={`Remove question ${qIdx + 1}`}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -477,10 +482,14 @@ export default function AdminTrainingPage() {
                   <div className="grid grid-cols-2 gap-2">
                     {q.options.map((opt, oIdx) => (
                       <div key={oIdx} className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">
+                        <Label
+                          htmlFor={`question-${qIdx}-option-${oIdx}`}
+                          className="text-xs text-muted-foreground"
+                        >
                           Option {String.fromCharCode(65 + oIdx)}
                         </Label>
                         <Input
+                          id={`question-${qIdx}-option-${oIdx}`}
                           value={opt}
                           onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
                           placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
@@ -495,7 +504,7 @@ export default function AdminTrainingPage() {
                       value={String(q.correct_index)}
                       onValueChange={(val) => updateCorrectIndex(qIdx, val)}
                     >
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-[180px]" aria-label="Correct answer">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

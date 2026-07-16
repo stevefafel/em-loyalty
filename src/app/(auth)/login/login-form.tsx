@@ -55,7 +55,10 @@ export function LoginForm({ users, shopsByUser }: LoginFormProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-exxon-charcoal">
+        <label
+          htmlFor="login-user"
+          className="text-sm font-semibold text-exxon-charcoal"
+        >
           Select User
         </label>
         <Select
@@ -65,7 +68,7 @@ export function LoginForm({ users, shopsByUser }: LoginFormProps) {
             setSelectedShopId("");
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger id="login-user">
             <SelectValue placeholder="Choose a user..." />
           </SelectTrigger>
           <SelectContent>
@@ -92,11 +95,14 @@ export function LoginForm({ users, shopsByUser }: LoginFormProps) {
 
       {isShopUser && userShops.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-exxon-charcoal">
+          <label
+            htmlFor="login-shop"
+            className="text-sm font-semibold text-exxon-charcoal"
+          >
             Select Shop
           </label>
           <Select value={selectedShopId} onValueChange={setSelectedShopId}>
-            <SelectTrigger>
+            <SelectTrigger id="login-shop">
               <SelectValue placeholder="Choose a shop..." />
             </SelectTrigger>
             <SelectContent>
@@ -125,7 +131,7 @@ export function LoginForm({ users, shopsByUser }: LoginFormProps) {
       )}
 
       {isShopUser && userShops.length === 0 && (
-        <p className="text-sm text-red-500">
+        <p role="alert" className="text-sm text-exxon-red">
           This user is not associated with any shops.
         </p>
       )}

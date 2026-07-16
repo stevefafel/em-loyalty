@@ -487,7 +487,7 @@ function AdminDashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Pending Invoices
             </CardTitle>
-            <ClipboardCheck className="h-5 w-5 text-yellow-600" />
+            <ClipboardCheck className="h-5 w-5 text-yellow-700" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
@@ -500,7 +500,7 @@ function AdminDashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Pending Enrollments
             </CardTitle>
-            <Upload className="h-5 w-5 text-yellow-600" />
+            <Upload className="h-5 w-5 text-yellow-700" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">

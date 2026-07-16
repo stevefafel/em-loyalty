@@ -233,7 +233,7 @@ export default function TrainingModulePage() {
                         />
                         <span className="text-sm">{option}</span>
                         {showResult && isCorrect && (
-                          <CheckCircle className="ml-auto h-4 w-4 text-green-600" />
+                          <CheckCircle className="ml-auto h-4 w-4 text-green-700" />
                         )}
                         {showResult && isSelected && !isCorrect && (
                           <XCircle className="ml-auto h-4 w-4 text-red-600" />
@@ -258,7 +258,7 @@ export default function TrainingModulePage() {
                     : "Keep studying and try again!"}
                 </p>
                 {result.pointsAwarded !== undefined && result.pointsAwarded > 0 && (
-                  <p className="text-sm text-green-600 font-semibold mt-2">
+                  <p className="text-sm text-green-700 font-semibold mt-2">
                     +{result.pointsAwarded} points earned!
                   </p>
                 )}

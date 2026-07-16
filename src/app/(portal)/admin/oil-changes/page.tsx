@@ -131,7 +131,7 @@ export default function AdminOilChangesPage() {
             onValueChange={setSelectedShopId}
             disabled={isLoadingShops}
           >
-            <SelectTrigger className="w-full md:w-[360px]">
+            <SelectTrigger className="w-full md:w-[360px]" aria-label="Select shop">
               <SelectValue placeholder={isLoadingShops ? "Loading shops..." : "Select a shop"} />
             </SelectTrigger>
             <SelectContent>
@@ -235,6 +235,7 @@ export default function AdminOilChangesPage() {
                             variant="ghost"
                             onClick={() => handleDelete(entry.id)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            aria-label={`Delete entry for ${entry.date}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

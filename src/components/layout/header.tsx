@@ -66,9 +66,13 @@ export function Header() {
           size="sm"
           className="relative text-exxon-gray hover:text-exxon-charcoal"
           onClick={() => {}}
+          aria-label="Notifications, 0 unread"
         >
           <Bell className="h-4.5 w-4.5" />
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-exxon-red text-[10px] font-bold text-white">
+          <span
+            aria-hidden="true"
+            className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-exxon-red text-[10px] font-bold text-white"
+          >
             0
           </span>
         </Button>
@@ -88,6 +92,7 @@ export function Header() {
           size="sm"
           onClick={handleLogout}
           className="text-exxon-gray hover:text-exxon-red"
+          aria-label="Sign out"
         >
           <LogOut className="h-4 w-4" />
         </Button>

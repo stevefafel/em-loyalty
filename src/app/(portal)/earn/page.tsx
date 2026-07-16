@@ -264,7 +264,7 @@ export default function EarnAndTrackPage() {
             Complete Training
           </Link>
         </Button>
-        <Button variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 h-auto py-2.5 px-3" asChild>
+        <Button variant="outline" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 h-auto py-2.5 px-3" asChild>
           <Link href="/dashboard">
             <Eye className="h-4 w-4 mr-2" />
             View Tier Status
@@ -467,7 +467,7 @@ export default function EarnAndTrackPage() {
                         <TableCell
                           className={`text-right font-semibold ${
                             entry.type === "credit"
-                              ? "text-green-600"
+                              ? "text-green-700"
                               : "text-red-600"
                           }`}
                         >

@@ -55,7 +55,7 @@ const tiers = [
     name: "Gold",
     minChanges: 200,
     icon: Trophy,
-    color: "text-yellow-600",
+    color: "text-yellow-700",
     bgColor: "bg-yellow-50",
     borderColor: "border-yellow-400",
     rewards: [

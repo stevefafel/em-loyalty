@@ -308,11 +308,11 @@ export default function ShopDetailsPage() {
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="rounded-lg border p-4 text-center">
-                  <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
+                  <p className="text-2xl font-bold text-yellow-700">{pendingCount}</p>
                   <p className="text-sm text-muted-foreground">Pending</p>
                 </div>
                 <div className="rounded-lg border p-4 text-center">
-                  <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
+                  <p className="text-2xl font-bold text-green-700">{approvedCount}</p>
                   <p className="text-sm text-muted-foreground">Approved</p>
                 </div>
                 <div className="rounded-lg border p-4 text-center">
@@ -460,7 +460,7 @@ export default function ShopDetailsPage() {
                         <TableCell
                           className={`text-right font-semibold ${
                             entry.type === "credit"
-                              ? "text-green-600"
+                              ? "text-green-700"
                               : "text-red-600"
                           }`}
                         >

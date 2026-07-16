@@ -230,6 +230,7 @@ export default function AdminCollateralPage() {
                           variant="outline"
                           className="text-exxon-blue hover:text-exxon-blue hover:bg-blue-50"
                           onClick={() => setPreviewTarget(mat)}
+                          aria-label={`Preview ${mat.title}`}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -237,6 +238,7 @@ export default function AdminCollateralPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => openEdit(mat)}
+                          aria-label={`Edit ${mat.title}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -245,6 +247,7 @@ export default function AdminCollateralPage() {
                           variant="outline"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => setDeleteTarget(mat)}
+                          aria-label={`Delete ${mat.title}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

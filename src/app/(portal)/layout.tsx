@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/auth-context";
 import { ShopProvider } from "@/context/shop-context";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
 import type { Shop, User } from "@/types/database";
 
 // Prisma returns Date objects; our manual types expect ISO strings
@@ -92,15 +93,35 @@ export default async function PortalLayout({
     >
       <ShopProvider initialShop={activeShop} initialShops={shops}>
         <div className="flex h-screen flex-col">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-exxon-charcoal focus:px-4 focus:py-2 focus:text-white focus:outline-2 focus:outline-white"
+          >
+            Skip to main content
+          </a>
           {/* Brand accent bar */}
           <div className="h-1 w-full bg-exxon-red shrink-0" />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <Header />
-              <main className="flex-1 overflow-y-auto p-6 bg-exxon-gray-lighter">
-                {children}
-              </main>
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex min-h-full flex-col">
+              <div className="flex flex-1">
+                <div className="sticky top-0 h-[calc(100vh-0.25rem)] shrink-0 self-start">
+                  <Sidebar />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="sticky top-0 z-10 shrink-0">
+                    <Header />
+                  </div>
+                  <main
+                    id="main-content"
+                    tabIndex={-1}
+                    className="flex-1 bg-exxon-gray-lighter p-6 outline-none"
+                  >
+                    {children}
+                  </main>
+                </div>
+              </div>
+              {/* Full-width site footer */}
+              <Footer />
             </div>
           </div>
         </div>

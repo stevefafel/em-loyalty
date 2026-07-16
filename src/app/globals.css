@@ -44,12 +44,14 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-  /* ExxonMobil brand colors */
-  --color-exxon-red: #F01523;
-  --color-exxon-red-dark: #D42E12;
+  /* ExxonMobil brand colors.
+     Red/grays darkened from brand spec (#F01523 / #6A737B) to meet the
+     WCAG 2.1 AA 4.5:1 contrast minimum against white and gray-lighter. */
+  --color-exxon-red: #DA0D1E;
+  --color-exxon-red-dark: #B8240E;
   --color-exxon-blue: #0036C1;
   --color-exxon-charcoal: #2B2926;
-  --color-exxon-gray: #6A737B;
+  --color-exxon-gray: #5D666E;
   --color-exxon-gray-light: #939598;
   --color-exxon-gray-lighter: #F4F5F7;
 }
@@ -62,31 +64,31 @@
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
   --popover-foreground: #1a1a1a;
-  --primary: #F01523;
+  --primary: #DA0D1E;
   --primary-foreground: #ffffff;
   --secondary: #0036C1;
   --secondary-foreground: #ffffff;
   --muted: #F4F5F7;
-  --muted-foreground: #6A737B;
+  --muted-foreground: #5D666E;
   --accent: #F4F5F7;
   --accent-foreground: #2B2926;
   --destructive: #dc2626;
   --border: #e5e7eb;
   --input: #e5e7eb;
-  --ring: #F01523;
-  --chart-1: #F01523;
+  --ring: #DA0D1E;
+  --chart-1: #DA0D1E;
   --chart-2: #0036C1;
   --chart-3: #2B2926;
   --chart-4: #6A737B;
-  --chart-5: #D42E12;
+  --chart-5: #B8240E;
   --sidebar: #2B2926;
   --sidebar-foreground: #f5f5f5;
-  --sidebar-primary: #F01523;
+  --sidebar-primary: #DA0D1E;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #3d3936;
   --sidebar-accent-foreground: #f5f5f5;
   --sidebar-border: #3d3936;
-  --sidebar-ring: #F01523;
+  --sidebar-ring: #DA0D1E;
 }
 
 @layer base {

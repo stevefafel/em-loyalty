@@ -111,7 +111,7 @@ export default function PointsPage() {
                     <TableCell
                       className={`text-right font-semibold ${
                         entry.type === "credit"
-                          ? "text-green-600"
+                          ? "text-green-700"
                           : "text-red-600"
                       }`}
                     >

@@ -31,7 +31,10 @@ const emprint = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Mobil 1 Premium Growth Program",
+  title: {
+    default: "Mobil 1 Premium Growth Program",
+    template: "%s | Mobil 1 Premium Growth",
+  },
   description: "B2B Premium Growth Program Portal for Auto Repair Shops",
 };
 
