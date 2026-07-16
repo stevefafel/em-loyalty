@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 
+import Link from "next/link";
 import { PrivacyCenterLink } from "./privacy-center-link";
 
 const FOOTER_LINKS = [
@@ -143,6 +144,12 @@ export function Footer() {
             className="flex flex-col gap-2 text-sm text-gray-300 sm:flex-row sm:items-center sm:gap-6"
           >
             <PrivacyCenterLink className="text-left transition-colors hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white" />
+            <Link
+              href="/delete-my-information"
+              className="transition-colors hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            >
+              Delete my information
+            </Link>
             {SUBFOOTER_LINKS.map((link) => (
               <a
                 key={link.label}
