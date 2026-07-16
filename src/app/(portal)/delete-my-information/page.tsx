@@ -22,10 +22,11 @@ import {
 import { CheckCircle, ShieldCheck } from "lucide-react";
 
 const RELATIONSHIPS = [
-  { value: "customer", label: "Customer" },
-  { value: "employee", label: "Employee or former employee" },
-  { value: "applicant", label: "Job applicant" },
-  { value: "agent", label: "Authorized agent on behalf of a consumer" },
+  { value: "shop-owner", label: "Shop Owner" },
+  { value: "shop-employee", label: "Shop Employee" },
+  { value: "consumer", label: "Consumer" },
+  { value: "mechanic-advisor-employee", label: "Mechanic Advisor Employee" },
+  { value: "other", label: "Other" },
 ];
 
 export default function DeleteMyInformationPage() {
