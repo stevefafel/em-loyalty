@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+
+const oneTrustDomainId = process.env.NEXT_PUBLIC_ONETRUST_DOMAIN_ID;
 
 const emprint = localFont({
   src: [
@@ -45,6 +48,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      {oneTrustDomainId && (
+        <>
+          <Script
+            src="https://cdn.cookielaw.org/scripttemplates/otSDKStub.js"
+            data-domain-script={oneTrustDomainId}
+            data-document-language="true"
+            strategy="beforeInteractive"
+          />
+          {/* OneTrust calls this after load and on every consent change */}
+          <Script id="onetrust-wrapper" strategy="beforeInteractive">
+            {`function OptanonWrapper() {}`}
+          </Script>
+        </>
+      )}
       <body className={`${emprint.variable} font-sans antialiased`}>
         {children}
         <Toaster />
