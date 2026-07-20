@@ -44,9 +44,15 @@ export async function PATCH(
   }
 
   // Only apply fields the client actually sent.
-  const updateData = Object.fromEntries(
-    Object.entries(parsed.data).filter(([, v]) => v !== undefined)
+  const { sent_welcome_packet, ...fields } = parsed.data;
+  const updateData: Record<string, unknown> = Object.fromEntries(
+    Object.entries(fields).filter(([, v]) => v !== undefined)
   );
+
+  // Timestamp is set server-side so clients only toggle a boolean.
+  if (sent_welcome_packet !== undefined) {
+    updateData.sent_welcome_packet_at = sent_welcome_packet ? new Date() : null;
+  }
 
   try {
     const data = await prisma.shop.update({

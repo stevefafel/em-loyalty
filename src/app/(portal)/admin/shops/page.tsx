@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
-import { Eye } from "lucide-react";
+import { Eye, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Shop } from "@/types/database";
 
@@ -62,6 +62,15 @@ export default function AdminShopsPage() {
     fetchShops();
   };
 
+  const handleMarkWelcomePacketSent = async (shopId: string) => {
+    await fetch(`/api/shops/${shopId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sent_welcome_packet: true }),
+    });
+    fetchShops();
+  };
+
   if (!isAdmin) return <p>Unauthorized</p>;
 
   return (
@@ -89,6 +98,7 @@ export default function AdminShopsPage() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Points</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Welcome Packet</TableHead>
                   <TableHead>Change Status</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
@@ -107,6 +117,27 @@ export default function AdminShopsPage() {
                       >
                         {shop.program_status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {shop.sent_welcome_packet_at ? (
+                        <Badge
+                          variant="outline"
+                          className="border-green-500 text-green-700 bg-green-50"
+                        >
+                          Sent {new Date(shop.sent_welcome_packet_at).toLocaleDateString()}
+                        </Badge>
+                      ) : shop.program_status === "approved" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleMarkWelcomePacketSent(shop.id)}
+                        >
+                          <Send className="h-4 w-4 mr-1" />
+                          Mark Sent
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Select

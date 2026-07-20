@@ -3,6 +3,10 @@ export const POINTS_PER_TRAINING = 10;
 export const POINTS_PER_OIL_CHANGE = 1;
 export const MIN_INITIAL_INVOICE = 2500;
 
+// Admin dashboard "Shops that Require Attention" thresholds
+export const ATTENTION_POINTS_THRESHOLD = 250; // balance strictly above this
+export const ATTENTION_STREAK_MONTHS = 3; // full months before the current one
+
 export const PROGRAM_STATUS = {
   NEW: "new",
   PENDING: "pending",

@@ -23,6 +23,8 @@ export const shopUpdateSchema = z.object({
   program_status: z
     .enum(["new", "pending", "approved", "rejected"])
     .optional(),
+  // true → stamp sent_welcome_packet_at now; false → clear it.
+  sent_welcome_packet: z.boolean().optional(),
 });
 
 export type ShopUpdateInput = z.infer<typeof shopUpdateSchema>;

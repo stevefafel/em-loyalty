@@ -34,7 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
-import { ArrowLeft, Eye, Award, Store, FileText, BookOpen, Pencil } from "lucide-react";
+import { ArrowLeft, Eye, Award, Store, FileText, BookOpen, Pencil, Send, Undo2 } from "lucide-react";
 import type { Shop, LoyaltyLedgerEntry } from "@/types/database";
 
 interface InvoiceWithRelations {
@@ -122,6 +122,19 @@ export default function ShopDetailsPage() {
   const closePreview = () => {
     setPreviewInvoice(null);
     setPreviewUrl(null);
+  };
+
+  const [updatingPacket, setUpdatingPacket] = useState(false);
+
+  const handleWelcomePacket = async (sent: boolean) => {
+    setUpdatingPacket(true);
+    await fetch(`/api/shops/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sent_welcome_packet: sent }),
+    });
+    await fetchData();
+    setUpdatingPacket(false);
   };
 
   const openEdit = () => {
@@ -283,6 +296,44 @@ export default function ShopDetailsPage() {
                     >
                       {shop.program_status}
                     </Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Welcome Packet</dt>
+                  <dd className="flex items-center gap-2">
+                    {shop.sent_welcome_packet_at ? (
+                      <>
+                        <Badge
+                          variant="outline"
+                          className="border-green-500 text-green-700 bg-green-50"
+                        >
+                          Sent {new Date(shop.sent_welcome_packet_at).toLocaleDateString()}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={updatingPacket}
+                          onClick={() => handleWelcomePacket(false)}
+                        >
+                          <Undo2 className="h-4 w-4 mr-1" />
+                          Undo
+                        </Button>
+                      </>
+                    ) : shop.program_status === "approved" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={updatingPacket}
+                        onClick={() => handleWelcomePacket(true)}
+                      >
+                        <Send className="h-4 w-4 mr-1" />
+                        Mark Sent
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">
+                        Not sent (shop not approved)
+                      </span>
+                    )}
                   </dd>
                 </div>
                 <div>

@@ -7,6 +7,15 @@ import { useShop } from "@/context/shop-context";
 import { useEnrollmentGuard } from "@/hooks/use-enrollment-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import Image from "next/image";
 import {
   Award,
@@ -19,7 +28,12 @@ import {
   RefreshCw,
   ShoppingCart,
   Check,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  ATTENTION_POINTS_THRESHOLD,
+  ATTENTION_STREAK_MONTHS,
+} from "@/lib/constants";
 import type { LoyaltyLedgerEntry, OilChangeCount } from "@/types/database";
 import {
   PEGASUS_THRESHOLD,
@@ -434,15 +448,31 @@ function ShopDashboard() {
   );
 }
 
+interface AttentionShop {
+  id: string;
+  name: string;
+  program_status: string;
+  loyalty_points_balance: number;
+  monthlyCounts: number[];
+  reasons: string[];
+}
+
+interface AttentionData {
+  months: string[];
+  shops: AttentionShop[];
+}
+
 function AdminDashboard() {
   const [totalShops, setTotalShops] = useState<number | null>(null);
   const [pendingInvoices, setPendingInvoices] = useState<number | null>(null);
   const [pendingEnrollments, setPendingEnrollments] = useState<number | null>(null);
+  const [attention, setAttention] = useState<AttentionData | null>(null);
 
   const fetchStats = useCallback(async () => {
-    const [shopsRes, invoicesRes] = await Promise.all([
+    const [shopsRes, invoicesRes, attentionRes] = await Promise.all([
       fetch("/api/shops"),
       fetch("/api/invoices"),
+      fetch("/api/shops/attention"),
     ]);
 
     const shopsData = await shopsRes.json();
@@ -457,6 +487,11 @@ function AdminDashboard() {
     setPendingInvoices(
       invoices.filter((i: { status: string }) => i.status === "pending").length
     );
+
+    if (attentionRes.ok) {
+      const attentionData = await attentionRes.json();
+      setAttention(attentionData.data || null);
+    }
   }, []);
 
   useEffect(() => {
@@ -509,6 +544,102 @@ function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-lg font-bold">
+              Shops that Require Attention
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Balance above {ATTENTION_POINTS_THRESHOLD} points, or{" "}
+              {PEGASUS_THRESHOLD}+ oil changes in each of the previous{" "}
+              {ATTENTION_STREAK_MONTHS} months.
+            </p>
+          </div>
+          <AlertTriangle className="h-5 w-5 text-yellow-700" />
+        </CardHeader>
+        <CardContent>
+          {attention === null ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : attention.shops.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No shops currently require attention.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Shop</TableHead>
+                  <TableHead className="text-right">Points Balance</TableHead>
+                  {attention.months.map((month) => (
+                    <TableHead key={month} className="text-right">
+                      {month} Oil Changes
+                    </TableHead>
+                  ))}
+                  <TableHead>Reason</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {attention.shops.map((shop) => (
+                  <TableRow key={shop.id}>
+                    <TableCell>
+                      <Link
+                        href={`/admin/shops/${shop.id}`}
+                        className="font-medium text-exxon-blue hover:underline"
+                      >
+                        {shop.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-semibold ${
+                        shop.loyalty_points_balance > ATTENTION_POINTS_THRESHOLD
+                          ? "text-exxon-red"
+                          : ""
+                      }`}
+                    >
+                      {shop.loyalty_points_balance}
+                    </TableCell>
+                    {shop.monthlyCounts.map((count, i) => (
+                      <TableCell
+                        key={attention.months[i]}
+                        className={`text-right ${
+                          count >= PEGASUS_THRESHOLD
+                            ? "font-semibold text-green-700"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {count}
+                      </TableCell>
+                    ))}
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {shop.reasons.includes("high_balance") && (
+                          <Badge
+                            variant="outline"
+                            className="border-exxon-red text-exxon-red"
+                          >
+                            High point balance
+                          </Badge>
+                        )}
+                        {shop.reasons.includes("oil_change_streak") && (
+                          <Badge
+                            variant="outline"
+                            className="border-green-600 text-green-700"
+                          >
+                            {PEGASUS_THRESHOLD}+ oil changes,{" "}
+                            {ATTENTION_STREAK_MONTHS} months straight
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
