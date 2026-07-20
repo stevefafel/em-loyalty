@@ -1,11 +1,11 @@
 -- Admin user
-INSERT INTO users (id, email, name, phone, role) VALUES
-  ('a1000000-0000-4000-a000-000000000001', 'admin@mobil1.com', 'Admin User', '555-0100', 'admin');
+INSERT INTO users (id, email, first_name, last_name, phone, role) VALUES
+  ('a1000000-0000-4000-a000-000000000001', 'admin@mobil1.com', 'Admin', 'User', '555-0100', 'admin');
 
 -- Shop users
-INSERT INTO users (id, email, name, phone, role) VALUES
-  ('b2000000-0000-4000-a000-000000000001', 'owner@quicklube.com', 'John Quick', '555-0201', 'user'),
-  ('b3000000-0000-4000-a000-000000000001', 'tech@quicklube.com', 'Jane Wrench', '555-0301', 'user');
+INSERT INTO users (id, email, first_name, last_name, phone, role) VALUES
+  ('b2000000-0000-4000-a000-000000000001', 'owner@quicklube.com', 'John', 'Quick', '555-0201', 'user'),
+  ('b3000000-0000-4000-a000-000000000001', 'tech@quicklube.com', 'Jane', 'Wrench', '555-0301', 'user');
 
 -- Shops (one approved, one new)
 INSERT INTO shops (id, name, address, phone, program_status, loyalty_points_balance) VALUES

@@ -13,7 +13,13 @@ export default async function LoginPage() {
   const keycloak = authMode === "keycloak";
 
   // Only query users/shops for the mock picker; keycloak mode needs no DB.
-  let users: { id: string; email: string; name: string; role: string }[] = [];
+  let users: {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role: string;
+  }[] = [];
   let shopsByUser: Record<
     string,
     { id: string; name: string; program_status: string }[]
@@ -21,7 +27,13 @@ export default async function LoginPage() {
 
   if (!keycloak) {
     users = await prisma.user.findMany({
-      select: { id: true, email: true, name: true, role: true },
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+      },
       orderBy: { role: "asc" },
     });
 

@@ -17,6 +17,13 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+export function userFullName(user: {
+  first_name: string;
+  last_name: string;
+}): string {
+  return `${user.first_name} ${user.last_name}`.trim();
+}
+
 export function generateStoragePath(shopId: string, originalName: string): string {
   const timestamp = Date.now();
   return `${shopId}/${timestamp}_${originalName}`;

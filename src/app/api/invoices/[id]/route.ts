@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { userFullName } from "@/lib/utils";
 
 export async function GET(
   req: NextRequest,
@@ -16,7 +17,7 @@ export async function GET(
   const data = await prisma.invoice.findUnique({
     where: { id },
     include: {
-      user: { select: { name: true } },
+      user: { select: { first_name: true, last_name: true } },
       shop: { select: { name: true } },
       extraction: {
         include: {
@@ -30,5 +31,8 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ data });
+  // Preserve the existing response shape (user.name) for frontend consumers.
+  return NextResponse.json({
+    data: { ...data, user: { name: userFullName(data.user) } },
+  });
 }

@@ -10,9 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { userFullName } from "@/lib/utils";
 
 interface LoginFormProps {
-  users: { id: string; email: string; name: string; role: string }[];
+  users: {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role: string;
+  }[];
   shopsByUser: Record<
     string,
     { id: string; name: string; program_status: string }[]
@@ -75,7 +82,7 @@ export function LoginForm({ users, shopsByUser }: LoginFormProps) {
             {users.map((user) => (
               <SelectItem key={user.id} value={user.id}>
                 <div className="flex items-center gap-2">
-                  <span>{user.name}</span>
+                  <span>{userFullName(user)}</span>
                   <Badge
                     variant={user.role === "admin" ? "default" : "secondary"}
                     className={

@@ -5,6 +5,7 @@ import { useShop } from "@/context/shop-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShopSwitcher } from "./shop-switcher";
+import { userFullName } from "@/lib/utils";
 import { LogOut, CalendarDays, Bell } from "lucide-react";
 
 export function Header() {
@@ -86,7 +87,9 @@ export function Header() {
         >
           {isAdmin ? "Admin" : "Shop User"}
         </Badge>
-        <span className="text-sm text-exxon-gray">{user?.name}</span>
+        <span className="text-sm text-exxon-gray">
+          {user ? userFullName(user) : null}
+        </span>
         <Button
           variant="ghost"
           size="sm"

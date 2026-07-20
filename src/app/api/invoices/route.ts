@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { userFullName } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
   const data = await prisma.invoice.findMany({
     where,
     include: {
-      user: { select: { name: true } },
+      user: { select: { first_name: true, last_name: true } },
       shop: { select: { name: true } },
       extraction: { select: { status: true } },
     },
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   const mapped = data.map((inv) => ({
     ...inv,
     amount: Number(inv.amount),
-    users: { name: inv.user.name },
+    users: { name: userFullName(inv.user) },
     shops: { name: inv.shop.name },
     extraction_status: inv.extraction?.status || null,
   }));

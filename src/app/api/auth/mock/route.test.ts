@@ -56,7 +56,8 @@ describe("mock auth route", () => {
     findUnique.mockResolvedValue({
       id: USER_ID,
       email: "steve@steer.io",
-      name: "Steve",
+      first_name: "Steve",
+      last_name: "Fafel",
       role: "admin",
     });
     const { POST } = await loadRoute();
