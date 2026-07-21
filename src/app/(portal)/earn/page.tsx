@@ -278,7 +278,7 @@ export default function EarnAndTrackPage() {
           <CardContent className="py-3 text-center">
             <p className="text-xs text-muted-foreground mb-0.5">Stock-Up Promotions</p>
             <p className="text-xl font-bold text-exxon-red">15%</p>
-            <p className="text-xs text-muted-foreground">back on purchases of $2,500+</p>
+            <p className="text-xs text-muted-foreground">back on purchases of $500+</p>
           </CardContent>
         </Card>
         <Card>

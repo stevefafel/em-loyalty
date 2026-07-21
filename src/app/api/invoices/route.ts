@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { userFullName } from "@/lib/utils";
+import { MIN_INITIAL_INVOICE } from "@/lib/constants";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -56,9 +57,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (isInitial && amount < 2500) {
+  if (isInitial && amount < MIN_INITIAL_INVOICE) {
     return NextResponse.json(
-      { error: "Initial invoice must be at least $2,500" },
+      {
+        error: `Initial invoice must be at least $${MIN_INITIAL_INVOICE.toLocaleString()}`,
+      },
       { status: 400 }
     );
   }

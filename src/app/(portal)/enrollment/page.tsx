@@ -156,7 +156,7 @@ export default function EnrollmentPage() {
                 type="number"
                 step="0.01"
                 min={MIN_INITIAL_INVOICE}
-                placeholder="2500.00"
+                placeholder="500.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
