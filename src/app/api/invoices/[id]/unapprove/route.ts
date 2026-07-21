@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { calculatePoints } from "@/lib/utils";
 
 export async function POST(
   req: NextRequest,
@@ -27,7 +26,14 @@ export async function POST(
     );
   }
 
-  const pointsDelta = calculatePoints(Number(invoice.amount));
+  // Invoices no longer earn points, but legacy approvals credited them.
+  // Reverse the net amount actually recorded in the ledger for this invoice
+  // (zero for invoices approved after the program change).
+  const credited = await prisma.loyaltyLedger.aggregate({
+    where: { invoice_id: id },
+    _sum: { points_delta: true },
+  });
+  const pointsDelta = credited._sum.points_delta ?? 0;
 
   await prisma.$transaction([
     // Revert invoice status to pending
@@ -36,22 +42,28 @@ export async function POST(
       data: { status: "pending", updated_at: new Date() },
     }),
 
-    // Add debit ledger entry to reverse the credit
-    prisma.loyaltyLedger.create({
-      data: {
-        shop_id: invoice.shop_id,
-        invoice_id: id,
-        points_delta: -pointsDelta,
-        type: "debit",
-        description: `Invoice #${id.slice(0, 8)} approval reversed`,
-      },
-    }),
+    ...(pointsDelta !== 0
+      ? [
+          // Add debit ledger entry to reverse the credit
+          prisma.loyaltyLedger.create({
+            data: {
+              shop_id: invoice.shop_id,
+              invoice_id: id,
+              points_delta: -pointsDelta,
+              type: pointsDelta > 0 ? "debit" : "credit",
+              description: `Invoice #${id.slice(0, 8)} approval reversed`,
+            },
+          }),
+        ]
+      : []),
 
-    // Deduct points from shop balance
+    // Deduct points from shop balance (and revert status if initial)
     prisma.shop.update({
       where: { id: invoice.shop_id },
       data: {
-        loyalty_points_balance: { decrement: pointsDelta },
+        ...(pointsDelta !== 0
+          ? { loyalty_points_balance: { decrement: pointsDelta } }
+          : {}),
         updated_at: new Date(),
         ...(invoice.is_initial ? { program_status: "pending" } : {}),
       },

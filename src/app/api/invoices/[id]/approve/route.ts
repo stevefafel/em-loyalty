@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { calculatePoints } from "@/lib/utils";
 
 export async function POST(
   req: NextRequest,
@@ -28,45 +27,27 @@ export async function POST(
     );
   }
 
-  // 2. Calculate points
-  const pointsDelta = calculatePoints(Number(invoice.amount));
-
-  // 3. Run all updates in a transaction
+  // Invoices no longer earn points — approval only drives enrollment.
   await prisma.$transaction([
-    // Update invoice status
     prisma.invoice.update({
       where: { id },
       data: { status: "approved", updated_at: new Date() },
     }),
 
-    // Insert ledger entry
-    prisma.loyaltyLedger.create({
-      data: {
-        shop_id: invoice.shop_id,
-        invoice_id: id,
-        points_delta: pointsDelta,
-        type: "credit",
-        description: invoice.is_initial
-          ? "Initial qualifying invoice approved"
-          : `Invoice #${id.slice(0, 8)} approved`,
-      },
-    }),
-
-    // Update shop points balance (and status if initial)
-    prisma.shop.update({
-      where: { id: invoice.shop_id },
-      data: {
-        loyalty_points_balance: { increment: pointsDelta },
-        updated_at: new Date(),
-        ...(invoice.is_initial ? { program_status: "approved" } : {}),
-      },
-    }),
+    ...(invoice.is_initial
+      ? [
+          prisma.shop.update({
+            where: { id: invoice.shop_id },
+            data: { program_status: "approved", updated_at: new Date() },
+          }),
+        ]
+      : []),
   ]);
 
   return NextResponse.json({
     data: {
       invoiceId: id,
-      pointsAwarded: pointsDelta,
+      pointsAwarded: 0,
       shopApproved: invoice.is_initial,
     },
   });

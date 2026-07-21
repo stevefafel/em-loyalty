@@ -177,7 +177,8 @@ export default function EarnAndTrackPage() {
             <DialogHeader>
               <DialogTitle>Upload New Invoice</DialogTitle>
               <DialogDescription>
-                Submit a Mobil 1 purchase invoice to earn premium growth points.
+                Submit a Mobil 1 purchase invoice for program enrollment and
+                purchase tracking.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleUpload} className="space-y-4">
@@ -276,9 +277,9 @@ export default function EarnAndTrackPage() {
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground mb-0.5">Stock-Up Promotions</p>
-            <p className="text-xl font-bold text-exxon-red">15%</p>
-            <p className="text-xs text-muted-foreground">back on purchases of $500+</p>
+            <p className="text-xs text-muted-foreground mb-0.5">Pegasus Status</p>
+            <p className="text-xl font-bold text-exxon-red">10 pts</p>
+            <p className="text-xs text-muted-foreground">every month in Pegasus Mode</p>
           </CardContent>
         </Card>
         <Card>

@@ -210,7 +210,6 @@ export default function AdminInvoicesPage() {
                   <TableHead>Submitted By</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Points</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -231,9 +230,6 @@ export default function AdminInvoicesPage() {
                       ) : (
                         "Regular"
                       )}
-                    </TableCell>
-                    <TableCell>
-                      +{Math.floor(Number(inv.amount) / 100)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -653,7 +649,7 @@ export default function AdminInvoicesPage() {
               {deleteTarget?.status === "approved" && (
                 <>
                   {" "}
-                  This invoice was approved, so its awarded points will be
+                  This invoice was approved — any points it awarded will be
                   deducted from the shop&apos;s balance.
                 </>
               )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { POINTS_PER_OIL_CHANGE } from "@/lib/constants";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -54,11 +55,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
   }
 
-  const entry = await prisma.oilChangeCount.upsert({
+  // Upserts overwrite a day's count, so points adjust by the difference
+  // between the new count and whatever was already recorded for that day.
+  const existing = await prisma.oilChangeCount.findUnique({
     where: { shop_id_date: { shop_id: shopId, date: dateOnly } },
-    create: { shop_id: shopId, date: dateOnly, count: countNum },
-    update: { count: countNum, updated_at: new Date() },
+    select: { count: true },
   });
+  const countDelta = countNum - (existing?.count ?? 0);
+  const pointsDelta = countDelta * POINTS_PER_OIL_CHANGE;
+
+  const [entry] = await prisma.$transaction([
+    prisma.oilChangeCount.upsert({
+      where: { shop_id_date: { shop_id: shopId, date: dateOnly } },
+      create: { shop_id: shopId, date: dateOnly, count: countNum },
+      update: { count: countNum, updated_at: new Date() },
+    }),
+
+    ...(pointsDelta !== 0
+      ? [
+          prisma.loyaltyLedger.create({
+            data: {
+              shop_id: shopId,
+              points_delta: pointsDelta,
+              type: pointsDelta > 0 ? "credit" : "debit",
+              description: `Oil changes on ${date} (${
+                countDelta > 0 ? "+" : ""
+              }${countDelta})`,
+            },
+          }),
+          prisma.shop.update({
+            where: { id: shopId },
+            data: {
+              loyalty_points_balance: { increment: pointsDelta },
+              updated_at: new Date(),
+            },
+          }),
+        ]
+      : []),
+  ]);
 
   return NextResponse.json({ data: entry });
 }

@@ -155,7 +155,7 @@ function ShopDashboard() {
               Premium Growth
             </p>
             <p className="text-white/70 mt-2 text-xs">
-              Earn points on purchases, oil changes, and training to unlock rewards.
+              Earn points on oil changes, training, and Pegasus Status to unlock rewards.
             </p>
           </div>
           {/* Right half — interchangeable banner image (hidden until upload is implemented) */}

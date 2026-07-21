@@ -1,4 +1,3 @@
-export const POINTS_RATE = 0.15; // 15% back on purchases
 export const POINTS_PER_TRAINING = 10;
 export const POINTS_PER_OIL_CHANGE = 1;
 export const MIN_INITIAL_INVOICE = 500;

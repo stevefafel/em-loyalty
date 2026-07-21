@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { calculatePoints, userFullName } from "@/lib/utils";
+import { userFullName } from "@/lib/utils";
 import { createAdminClient } from "@/lib/supabase/server";
 import { STORAGE_BUCKETS } from "@/lib/constants";
 
@@ -56,19 +56,24 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const pointsReverted =
-    invoice.status === "approved" ? calculatePoints(Number(invoice.amount)) : 0;
+  // Invoices no longer earn points, but legacy approvals credited them.
+  // Reverse the net amount actually recorded in the ledger for this invoice
+  // (zero for invoices approved after the program change).
+  const credited = await prisma.loyaltyLedger.aggregate({
+    where: { invoice_id: id },
+    _sum: { points_delta: true },
+  });
+  const pointsReverted = credited._sum.points_delta ?? 0;
 
   await prisma.$transaction(async (tx) => {
-    // An approved invoice already credited points — reverse them so the
-    // balance stays consistent. The ledger keeps the original credit entry
-    // (invoice_id nulls out on delete) plus this debit as the audit trail.
-    if (pointsReverted > 0) {
+    // The ledger keeps the original credit entry (invoice_id nulls out on
+    // delete) plus this debit as the audit trail.
+    if (pointsReverted !== 0) {
       await tx.loyaltyLedger.create({
         data: {
           shop_id: invoice.shop_id,
           points_delta: -pointsReverted,
-          type: "debit",
+          type: pointsReverted > 0 ? "debit" : "credit",
           description: `Invoice #${id.slice(0, 8)} deleted (approval reversed)`,
         },
       });
