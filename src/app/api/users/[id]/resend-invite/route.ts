@@ -33,7 +33,7 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const provisioning = await provisionKeycloakUser(
+  const { status: provisioning, keycloakUserId } = await provisionKeycloakUser(
     {
       email: user.email,
       firstName: user.first_name,
@@ -41,6 +41,12 @@ export async function POST(
     },
     { resendIfExisting: true }
   );
+
+  if (keycloakUserId && user.keycloak_id !== keycloakUserId) {
+    await prisma.user
+      .update({ where: { id: user.id }, data: { keycloak_id: keycloakUserId } })
+      .catch(() => {});
+  }
 
   if (provisioning === "failed") {
     return NextResponse.json(

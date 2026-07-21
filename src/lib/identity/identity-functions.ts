@@ -132,6 +132,12 @@ export type ProvisioningStatus =
   | "skipped" // identity-functions not configured
   | "failed"; // identity call failed (user CRUD still succeeded)
 
+export interface ProvisioningResult {
+  status: ProvisioningStatus;
+  /** Keycloak user id (== token `sub` claim), when the account was found or created. */
+  keycloakUserId?: string;
+}
+
 /**
  * Ensure a Keycloak account exists for the given user and (when newly created)
  * send the set-password email. Never throws — failures resolve to `"failed"`
@@ -143,21 +149,23 @@ export type ProvisioningStatus =
 export async function provisionKeycloakUser(
   data: { email: string; firstName?: string; lastName?: string },
   options?: { resendIfExisting?: boolean }
-): Promise<ProvisioningStatus> {
-  if (!identityFunctionsConfigured()) return "skipped";
+): Promise<ProvisioningResult> {
+  if (!identityFunctionsConfigured()) return { status: "skipped" };
 
   try {
     const existing = await findUserByEmail(data.email);
     if (existing) {
-      if (!options?.resendIfExisting) return "existing";
+      if (!options?.resendIfExisting) {
+        return { status: "existing", keycloakUserId: existing.id };
+      }
       await sendActionsEmail(existing.id, ["UPDATE_PASSWORD"]);
-      return "resent";
+      return { status: "resent", keycloakUserId: existing.id };
     }
     const created = await upsertUser(data);
     await sendActionsEmail(created.id, ["UPDATE_PASSWORD"]);
-    return "invited";
+    return { status: "invited", keycloakUserId: created.id };
   } catch (err) {
     console.error(`Keycloak provisioning failed for ${data.email}`, err);
-    return "failed";
+    return { status: "failed" };
   }
 }

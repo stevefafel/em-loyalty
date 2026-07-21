@@ -78,6 +78,9 @@ model Shop {
 model User {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email      String   @unique
+  /// Keycloak subject UUID. Linked at login (verified-email match) or at
+  /// provisioning time; identity matching prefers this over email.
+  keycloak_id String? @unique @db.Uuid
   first_name String
   last_name  String
   phone      String?

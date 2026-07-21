@@ -73,11 +73,19 @@ export async function POST(req: NextRequest) {
     // Best-effort: ensure a Keycloak account exists and send the set-password
     // email. Never blocks user creation — "failed" is surfaced to the admin,
     // who can retry via "Resend setup email".
-    const provisioning = await provisionKeycloakUser({
+    const { status: provisioning, keycloakUserId } = await provisionKeycloakUser({
       email: data.email,
       firstName: data.first_name,
       lastName: data.last_name,
     });
+
+    if (keycloakUserId) {
+      // Link the row to its Keycloak account ahead of first login. Best-effort:
+      // the login callback stamps the link anyway on a verified email match.
+      await prisma.user
+        .update({ where: { id: data.id }, data: { keycloak_id: keycloakUserId } })
+        .catch(() => {});
+    }
 
     return NextResponse.json(
       { data: toClientUser(data), provisioning },

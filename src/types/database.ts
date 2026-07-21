@@ -20,6 +20,7 @@ export interface Shop {
 export interface User {
   id: string;
   email: string;
+  keycloak_id: string | null;
   first_name: string;
   last_name: string;
   phone: string | null;

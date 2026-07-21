@@ -66,16 +66,39 @@ export async function GET(req: NextRequest) {
   const claims = (tokens.claims() ?? {}) as Record<string, unknown>;
   const email = normalizeEmail(claims.email);
   const emailVerified = claims.email_verified === true;
+  const sub = typeof claims.sub === "string" && claims.sub ? claims.sub : null;
 
   // Only touch the DB once the email claim is present and verified.
-  let user: { id: string; role: "admin" | "user" } | null = null;
+  let user: { id: string; role: "admin" | "user"; keycloak_id?: string | null } | null =
+    null;
   let shops: { id: string }[] = [];
   try {
     if (email && emailVerified) {
-      user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, role: true },
-      });
+      // Linked users match on the stable Keycloak subject id, so a changed
+      // email (on either side) can't lock them out or swap their identity.
+      if (sub) {
+        user = await prisma.user.findUnique({
+          where: { keycloak_id: sub },
+          select: { id: true, role: true, keycloak_id: true },
+        });
+      }
+      if (!user) {
+        // First login (or pre-linking row): match by verified email, then
+        // stamp the sub so future logins survive email edits. Stamping over a
+        // different stored sub is deliberate — a verified email match is the
+        // same trust basis linking used in the first place, and it lets an
+        // admin email-swap hand the row to the new person's account.
+        user = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true, role: true, keycloak_id: true },
+        });
+        if (user && sub && user.keycloak_id !== sub) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { keycloak_id: sub },
+          });
+        }
+      }
       if (user) {
         const userShops = await prisma.userShop.findMany({
           where: { user_id: user.id },
