@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getScormPackageUrl } from "@/lib/supabase/storage";
+import { createAdminClient } from "@/lib/supabase/server";
+import { STORAGE_BUCKETS } from "@/lib/constants";
 import JSZip from "jszip";
 
 // Cache extracted packages in memory for the session (avoids re-downloading)
@@ -14,17 +15,15 @@ async function getZip(scormPath: string): Promise<JSZip> {
     return cached.zip;
   }
 
-  const { url, error } = await getScormPackageUrl(scormPath);
-  if (error || !url) {
-    throw new Error("Failed to get SCORM package URL");
-  }
-
-  const response = await fetch(url);
-  if (!response.ok) {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKETS.SCORM_PACKAGES)
+    .download(scormPath);
+  if (error || !data) {
     throw new Error("Failed to download SCORM package");
   }
 
-  const buffer = await response.arrayBuffer();
+  const buffer = await data.arrayBuffer();
   const zip = await JSZip.loadAsync(buffer);
   zipCache.set(scormPath, { zip, timestamp: Date.now() });
   return zip;
