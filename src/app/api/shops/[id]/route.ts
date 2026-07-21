@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { shopUpdateSchema } from "@/lib/validators/shop";
+import { createAdminClient } from "@/lib/supabase/server";
+import { STORAGE_BUCKETS } from "@/lib/constants";
 
 export async function GET(
   req: NextRequest,
@@ -80,4 +82,42 @@ export async function PATCH(
     }
     throw err;
   }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const shop = await prisma.shop.findUnique({
+    where: { id },
+    select: { id: true, invoices: { select: { file_path: true } } },
+  });
+
+  if (!shop) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Related rows (user_shops, invoices, ledger, etc.) cascade at the DB level.
+  await prisma.shop.delete({ where: { id } });
+
+  // Best-effort cleanup of uploaded invoice files; the DB rows are already
+  // gone, so a storage failure shouldn't fail the request.
+  const filePaths = shop.invoices.map((i) => i.file_path).filter(Boolean);
+  if (filePaths.length > 0) {
+    try {
+      const supabase = createAdminClient();
+      await supabase.storage.from(STORAGE_BUCKETS.INVOICES).remove(filePaths);
+    } catch (err) {
+      console.error("Failed to remove invoice files for deleted shop", id, err);
+    }
+  }
+
+  return NextResponse.json({ success: true });
 }

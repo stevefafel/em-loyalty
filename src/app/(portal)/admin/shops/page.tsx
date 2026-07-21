@@ -25,8 +25,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { Eye, Send } from "lucide-react";
+import { Eye, Plus, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Shop } from "@/types/database";
 
@@ -37,10 +47,29 @@ const statusColors: Record<string, string> = {
   rejected: "border-red-500 text-red-700 bg-red-50",
 };
 
+const emptyShopForm = {
+  name: "",
+  address: "",
+  phone: "",
+  steer_shop_id: "",
+  autoops_shop_id: "",
+};
+
 export default function AdminShopsPage() {
   const { isAdmin } = useAuth();
   const [shops, setShops] = useState<Shop[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Add shop dialog state
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState(emptyShopForm);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState("");
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<Shop | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchShops = useCallback(async () => {
     const res = await fetch("/api/shops");
@@ -71,13 +100,80 @@ export default function AdminShopsPage() {
     fetchShops();
   };
 
+  const openAdd = () => {
+    setAddForm(emptyShopForm);
+    setAddError("");
+    setAddOpen(true);
+  };
+
+  const handleCreateShop = async () => {
+    setAddSaving(true);
+    setAddError("");
+
+    const res = await fetch("/api/shops", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(addForm),
+    });
+
+    if (res.ok) {
+      setAddOpen(false);
+      fetchShops();
+    } else {
+      const data = await res.json().catch(() => null);
+      const fieldError =
+        data?.error && typeof data.error === "object"
+          ? Object.values(data.error).flat().filter(Boolean).join(" ")
+          : null;
+      setAddError(
+        typeof data?.error === "string"
+          ? data.error
+          : fieldError ||
+              `Failed to create shop (${res.status}). Please check the fields and try again.`
+      );
+    }
+    setAddSaving(false);
+  };
+
+  const handleDeleteShop = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError("");
+
+    const res = await fetch(`/api/shops/${deleteTarget.id}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setDeleteTarget(null);
+      fetchShops();
+    } else {
+      const data = await res.json().catch(() => null);
+      setDeleteError(
+        typeof data?.error === "string"
+          ? data.error
+          : `Failed to delete shop (${res.status}).`
+      );
+    }
+    setDeleting(false);
+  };
+
   if (!isAdmin) return <p>Unauthorized</p>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-exxon-charcoal">
-        Manage Shops
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-exxon-charcoal">
+          Manage Shops
+        </h1>
+        <Button
+          onClick={openAdd}
+          className="bg-exxon-red text-white hover:bg-exxon-red/90"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Add Shop
+        </Button>
+      </div>
 
       <Card>
         <CardHeader>
@@ -161,12 +257,26 @@ export default function AdminShopsPage() {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/admin/shops/${shop.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/admin/shops/${shop.id}`}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label={`Delete ${shop.name}`}
+                          onClick={() => {
+                            setDeleteError("");
+                            setDeleteTarget(shop);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -175,6 +285,127 @@ export default function AdminShopsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Shop Modal */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Shop</DialogTitle>
+            <DialogDescription>
+              Create a new shop. Platform cross-references can be added now or
+              later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-shop-name">Shop Name</Label>
+              <Input
+                id="new-shop-name"
+                value={addForm.name}
+                onChange={(e) =>
+                  setAddForm({ ...addForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-shop-address">Shop Address</Label>
+              <Input
+                id="new-shop-address"
+                value={addForm.address}
+                onChange={(e) =>
+                  setAddForm({ ...addForm, address: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-shop-phone">Shop Phone</Label>
+              <Input
+                id="new-shop-phone"
+                value={addForm.phone}
+                onChange={(e) =>
+                  setAddForm({ ...addForm, phone: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-steer-shop-id">Steer Shop ID</Label>
+              <Input
+                id="new-steer-shop-id"
+                placeholder="UUID from the Steer platform"
+                value={addForm.steer_shop_id}
+                onChange={(e) =>
+                  setAddForm({ ...addForm, steer_shop_id: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-autoops-shop-id">AutoOps Shop ID</Label>
+              <Input
+                id="new-autoops-shop-id"
+                placeholder="ID from the AutoOps platform (e.g. cl_...)"
+                value={addForm.autoops_shop_id}
+                onChange={(e) =>
+                  setAddForm({ ...addForm, autoops_shop_id: e.target.value })
+                }
+              />
+            </div>
+            {addError && <p className="text-sm text-red-600">{addError}</p>}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddOpen(false)}
+              disabled={addSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateShop}
+              disabled={addSaving}
+              className="bg-exxon-red text-white hover:bg-exxon-red/90"
+            >
+              {addSaving ? "Creating..." : "Create Shop"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Shop</DialogTitle>
+            <DialogDescription>
+              Permanently delete{" "}
+              <span className="font-semibold">{deleteTarget?.name}</span>? This
+              also removes its invoices, points history, training records, and
+              user assignments. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteShop}
+              disabled={deleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deleting ? "Deleting..." : "Delete Shop"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

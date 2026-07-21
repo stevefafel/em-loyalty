@@ -9,6 +9,24 @@ const optionalText = z.preprocess(
   z.string().trim().nullable().optional()
 );
 
+export const shopCreateSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  address: optionalText,
+  phone: optionalText,
+  // Steer platform IDs are UUIDs.
+  steer_shop_id: z.preprocess(
+    emptyToNull,
+    z.uuid("Steer Shop ID must be a valid UUID").nullable().optional()
+  ),
+  // AutoOps IDs are free-form (e.g. "cl_dfeeb55c170a4810834a02aeb99ec9fe").
+  autoops_shop_id: optionalText,
+  program_status: z
+    .enum(["new", "pending", "approved", "rejected"])
+    .optional(),
+});
+
+export type ShopCreateInput = z.infer<typeof shopCreateSchema>;
+
 export const shopUpdateSchema = z.object({
   name: z.string().trim().min(1, "Name is required").optional(),
   address: optionalText,
