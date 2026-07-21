@@ -11,7 +11,8 @@ import {
  * Shops needing admin attention:
  *  - points balance above ATTENTION_POINTS_THRESHOLD, or
  *  - PEGASUS_THRESHOLD+ oil changes in each of the previous
- *    ATTENTION_STREAK_MONTHS full calendar months (current month excluded).
+ *    ATTENTION_STREAK_MONTHS full calendar months (current month excluded), or
+ *  - approved into the program but never sent a welcome packet.
  */
 export async function GET() {
   const session = await getSession();
@@ -41,6 +42,7 @@ export async function GET() {
         name: true,
         program_status: true,
         loyalty_points_balance: true,
+        sent_welcome_packet_at: true,
       },
     }),
     prisma.oilChangeCount.findMany({
@@ -67,6 +69,9 @@ export async function GET() {
       }
       if (monthlyCounts.every((c) => c >= PEGASUS_THRESHOLD)) {
         reasons.push("oil_change_streak");
+      }
+      if (shop.program_status === "approved" && !shop.sent_welcome_packet_at) {
+        reasons.push("no_welcome_packet");
       }
       return { ...shop, monthlyCounts, reasons };
     })

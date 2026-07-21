@@ -552,9 +552,10 @@ function AdminDashboard() {
               Shops that Require Attention
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Balance above {ATTENTION_POINTS_THRESHOLD} points, or{" "}
+              Balance above {ATTENTION_POINTS_THRESHOLD} points,{" "}
               {PEGASUS_THRESHOLD}+ oil changes in each of the previous{" "}
-              {ATTENTION_STREAK_MONTHS} months.
+              {ATTENTION_STREAK_MONTHS} months, or approved without a welcome
+              packet sent.
             </p>
           </div>
           <AlertTriangle className="h-5 w-5 text-yellow-700" />
@@ -629,6 +630,14 @@ function AdminDashboard() {
                           >
                             {PEGASUS_THRESHOLD}+ oil changes,{" "}
                             {ATTENTION_STREAK_MONTHS} months straight
+                          </Badge>
+                        )}
+                        {shop.reasons.includes("no_welcome_packet") && (
+                          <Badge
+                            variant="outline"
+                            className="border-yellow-600 text-yellow-700"
+                          >
+                            Welcome packet not sent
                           </Badge>
                         )}
                       </div>
