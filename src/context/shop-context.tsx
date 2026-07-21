@@ -26,6 +26,20 @@ export function ShopProvider({
   const [activeShop, setActiveShopState] = useState<Shop | null>(initialShop);
   const [shops, setShops] = useState<Shop[]>(initialShops);
 
+  // The server layout re-fetches shops on router.refresh() and passes new
+  // props, but state initialized from props doesn't follow them — re-sync here
+  // so refreshes surface server-side changes (e.g. program_status moving to
+  // "pending" after an enrollment invoice is submitted).
+  const [prevInitial, setPrevInitial] = useState({ initialShop, initialShops });
+  if (
+    prevInitial.initialShop !== initialShop ||
+    prevInitial.initialShops !== initialShops
+  ) {
+    setPrevInitial({ initialShop, initialShops });
+    setActiveShopState(initialShop);
+    setShops(initialShops);
+  }
+
   // The session cookie is httpOnly and sealed server-side, so the active shop
   // must be changed via a server route that re-seals it. Await the round-trip
   // before the caller refreshes, or the server re-renders the stale shop.

@@ -30,7 +30,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
-import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2 } from "lucide-react";
+import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import type { InvoiceExtraction } from "@/types/database";
 
 interface InvoiceWithRelations {
@@ -64,6 +64,11 @@ export default function AdminInvoicesPage() {
   const [actionLoading, setActionLoading] = useState<"approve" | "reject" | null>(null);
   const [extractionData, setExtractionData] = useState<InvoiceExtraction | null>(null);
   const [extractionLoading, setExtractionLoading] = useState(false);
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<InvoiceWithRelations | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchInvoices = useCallback(async () => {
     const res = await fetch("/api/invoices");
@@ -149,6 +154,29 @@ export default function AdminInvoicesPage() {
     if (res.ok) fetchInvoices();
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError("");
+
+    const res = await fetch(`/api/invoices/${deleteTarget.id}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setDeleteTarget(null);
+      fetchInvoices();
+    } else {
+      const data = await res.json().catch(() => null);
+      setDeleteError(
+        typeof data?.error === "string"
+          ? data.error
+          : `Failed to delete invoice (${res.status}).`
+      );
+    }
+    setDeleting(false);
+  };
+
   if (!isAdmin) return <p>Unauthorized</p>;
 
   const pendingInvoices = invoices.filter((i) => i.status === "pending");
@@ -208,15 +236,29 @@ export default function AdminInvoicesPage() {
                       +{Math.floor(Number(inv.amount) / 100)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-exxon-blue hover:text-exxon-blue hover:bg-blue-50"
-                        onClick={() => openReview(inv)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Review
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-exxon-blue hover:text-exxon-blue hover:bg-blue-50"
+                          onClick={() => openReview(inv)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Review
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label="Delete invoice"
+                          onClick={() => {
+                            setDeleteError("");
+                            setDeleteTarget(inv);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -267,14 +309,28 @@ export default function AdminInvoicesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleUnapprove(inv.id)}
-                      >
-                        <Undo2 className="h-4 w-4 mr-1" />
-                        Open for Review
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUnapprove(inv.id)}
+                        >
+                          <Undo2 className="h-4 w-4 mr-1" />
+                          Open for Review
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label="Delete invoice"
+                          onClick={() => {
+                            setDeleteError("");
+                            setDeleteTarget(inv);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -323,14 +379,28 @@ export default function AdminInvoicesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleUnreject(inv.id)}
-                      >
-                        <Undo2 className="h-4 w-4 mr-1" />
-                        Open for Review
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUnreject(inv.id)}
+                        >
+                          <Undo2 className="h-4 w-4 mr-1" />
+                          Open for Review
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label="Delete invoice"
+                          onClick={() => {
+                            setDeleteError("");
+                            setDeleteTarget(inv);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -557,6 +627,61 @@ export default function AdminInvoicesPage() {
             >
               <CheckCircle className="h-4 w-4 mr-1" />
               {actionLoading === "approve" ? "Approving..." : "Approve"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Invoice</DialogTitle>
+            <DialogDescription>
+              Permanently delete the{" "}
+              <span className="font-semibold">
+                {deleteTarget && formatCurrency(Number(deleteTarget.amount))}
+              </span>{" "}
+              invoice from{" "}
+              <span className="font-semibold">{deleteTarget?.shops?.name}</span>
+              ? The uploaded file and extracted data will also be removed.
+              {deleteTarget?.status === "approved" && (
+                <>
+                  {" "}
+                  This invoice was approved, so its awarded points will be
+                  deducted from the shop&apos;s balance.
+                </>
+              )}
+              {deleteTarget?.is_initial && (
+                <>
+                  {" "}
+                  This is an initial enrollment invoice — the shop&apos;s
+                  enrollment status will be recalculated.
+                </>
+              )}{" "}
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deleting ? "Deleting..." : "Delete Invoice"}
             </Button>
           </DialogFooter>
         </DialogContent>
