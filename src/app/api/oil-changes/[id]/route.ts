@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { POINTS_PER_OIL_CHANGE } from "@/lib/constants";
+import { reconcilePegasusAwards } from "@/lib/pegasus-awards";
 
 export async function DELETE(
   _req: NextRequest,
@@ -45,6 +46,13 @@ export async function DELETE(
         ]
       : []),
   ]);
+
+  // Removing a day's count may drop its month below the Pegasus threshold.
+  try {
+    await reconcilePegasusAwards(entry.shop_id);
+  } catch (err) {
+    console.error("Pegasus reconcile failed for shop", entry.shop_id, err);
+  }
 
   return NextResponse.json({ ok: true });
 }

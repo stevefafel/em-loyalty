@@ -69,6 +69,7 @@ model Shop {
   collateral_logs   CollateralLog[]
   loyalty_ledger    LoyaltyLedger[]
   oil_change_counts OilChangeCount[]
+  pegasus_awards    PegasusAward[]
 
   @@index([program_status])
   @@map("shops")
@@ -236,6 +237,21 @@ model OilChangeCount {
   @@unique([shop_id, date])
   @@index([shop_id, date])
   @@map("oil_change_counts")
+}
+
+// One row per (shop, month) whose Pegasus bonus has been credited to the
+// ledger. Source of truth for reconciliation: months due but absent here get
+// credited; rows here that are no longer due get clawed back and deleted.
+model PegasusAward {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shop_id    String   @db.Uuid
+  month      DateTime @db.Date // first day of the awarded month (UTC)
+  created_at DateTime @default(now()) @db.Timestamptz()
+
+  shop Shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@unique([shop_id, month])
+  @@map("pegasus_awards")
 }
 
 model LoyaltyLedger {

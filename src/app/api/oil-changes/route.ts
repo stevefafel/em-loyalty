@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { POINTS_PER_OIL_CHANGE } from "@/lib/constants";
+import { reconcilePegasusAwards } from "@/lib/pegasus-awards";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -16,6 +17,16 @@ export async function GET(req: NextRequest) {
     where.shop_id = session.shopId;
   } else if (shopId) {
     where.shop_id = shopId;
+  }
+
+  // Viewing a single shop's data is also a reconcile point, so a bonus that
+  // became due at a month rollover (with no data writes since) still lands.
+  if (where.shop_id) {
+    try {
+      await reconcilePegasusAwards(where.shop_id);
+    } catch (err) {
+      console.error("Pegasus reconcile failed for shop", where.shop_id, err);
+    }
   }
 
   const data = await prisma.oilChangeCount.findMany({
@@ -93,6 +104,15 @@ export async function POST(req: NextRequest) {
         ]
       : []),
   ]);
+
+  // The count change may start, extend, or break a Pegasus streak. The write
+  // above already committed, so a reconcile failure shouldn't fail the
+  // request — the next write or view of this shop's data will heal it.
+  try {
+    await reconcilePegasusAwards(shopId);
+  } catch (err) {
+    console.error("Pegasus reconcile failed for shop", shopId, err);
+  }
 
   return NextResponse.json({ data: entry });
 }
