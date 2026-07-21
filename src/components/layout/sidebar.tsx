@@ -32,12 +32,12 @@ const shopUserLinks = [
 
 const adminLinks = [
   { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/admin/invoices", label: "Review Invoices", icon: ClipboardCheck },
   { href: "/admin/shops", label: "Manage Shops", icon: Store },
-  { href: "/admin/users", label: "Manage Users", icon: Users },
+  { href: "/admin/invoices", label: "Review Invoices", icon: ClipboardCheck },
   { href: "/admin/oil-changes", label: "Oil Change Tracking", icon: Droplets },
   { href: "/admin/training", label: "Training", icon: GraduationCap },
   { href: "/admin/collateral", label: "Marketing Materials", icon: FileDown },
+  { href: "/admin/users", label: "Manage Users", icon: Users },
 ];
 
 const enrollmentLinks = [
