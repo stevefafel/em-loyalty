@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pencil, Trash2, UserPlus } from "lucide-react";
+import { Mail, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { userFullName } from "@/lib/utils";
 import type { User, UserRole } from "@/types/database";
 
@@ -88,6 +88,13 @@ export default function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Outcome of Keycloak provisioning (create or resend), shown above the table.
+  const [notice, setNotice] = useState<{
+    kind: "success" | "warning";
+    text: string;
+  } | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const [usersRes, shopsRes] = await Promise.all([
@@ -148,16 +155,53 @@ export default function AdminUsersPage() {
       }
     );
 
+    const body = await res.json().catch(() => null);
+
     if (!res.ok) {
-      const { error } = await res.json();
-      setFormError(formatApiError(error));
+      setFormError(formatApiError(body?.error));
       setSaving(false);
       return;
+    }
+
+    if (!editingUser) {
+      if (body?.provisioning === "invited") {
+        setNotice({
+          kind: "success",
+          text: `Setup email sent to ${form.email}.`,
+        });
+      } else if (body?.provisioning === "existing") {
+        setNotice({
+          kind: "success",
+          text: `${form.email} already has a Steer account and can sign in right away.`,
+        });
+      } else if (body?.provisioning === "failed") {
+        setNotice({
+          kind: "warning",
+          text: "User was added, but the setup email could not be sent. Use the resend button to retry.",
+        });
+      }
     }
 
     setSaving(false);
     setDialogOpen(false);
     fetchData();
+  };
+
+  const handleResend = async (user: AdminUser) => {
+    setResendingId(user.id);
+    setNotice(null);
+
+    const res = await fetch(`/api/users/${user.id}/resend-invite`, {
+      method: "POST",
+    });
+    const body = await res.json().catch(() => null);
+    setResendingId(null);
+
+    if (!res.ok) {
+      setNotice({ kind: "warning", text: formatApiError(body?.error) });
+      return;
+    }
+    setNotice({ kind: "success", text: `Setup email sent to ${user.email}.` });
   };
 
   const handleDelete = async () => {
@@ -197,6 +241,26 @@ export default function AdminUsersPage() {
           Add User
         </Button>
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className={`flex items-start justify-between gap-2 rounded-md border px-4 py-3 text-sm ${
+            notice.kind === "warning"
+              ? "border-amber-300 bg-amber-50 text-amber-800"
+              : "border-green-300 bg-green-50 text-green-800"
+          }`}
+        >
+          <p>{notice.text}</p>
+          <button
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+            className="shrink-0 opacity-60 hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -254,6 +318,16 @@ export default function AdminUsersPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => handleResend(user)}
+                          disabled={resendingId === user.id}
+                          title="Resend setup email"
+                          aria-label={`Resend setup email to ${userFullName(user)}`}
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => openEdit(user)}
                           aria-label={`Edit ${userFullName(user)}`}
                         >
@@ -292,7 +366,7 @@ export default function AdminUsersPage() {
             <DialogDescription>
               {editingUser
                 ? "Update the user's details and shop assignments."
-                : "The email must match the user's Steer (Keycloak) account for them to sign in."}
+                : "If the user doesn't have a Steer (Keycloak) account yet, one will be created and they'll receive an email to set their password."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

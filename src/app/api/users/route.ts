@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { userCreateSchema } from "@/lib/validators/user";
+import { provisionKeycloakUser } from "@/lib/identity/identity-functions";
 
 const userInclude = {
   user_shops: {
@@ -68,7 +69,20 @@ export async function POST(req: NextRequest) {
       },
       include: userInclude,
     });
-    return NextResponse.json({ data: toClientUser(data) }, { status: 201 });
+
+    // Best-effort: ensure a Keycloak account exists and send the set-password
+    // email. Never blocks user creation — "failed" is surfaced to the admin,
+    // who can retry via "Resend setup email".
+    const provisioning = await provisionKeycloakUser({
+      email: data.email,
+      firstName: data.first_name,
+      lastName: data.last_name,
+    });
+
+    return NextResponse.json(
+      { data: toClientUser(data), provisioning },
+      { status: 201 }
+    );
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
       return NextResponse.json(
