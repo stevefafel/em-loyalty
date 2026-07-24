@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Handshake,
   Droplets,
+  Bell,
 } from "lucide-react";
 
 const shopUserLinks = [
@@ -38,6 +39,7 @@ const adminLinks = [
   { href: "/admin/training", label: "Training", icon: GraduationCap },
   { href: "/admin/collateral", label: "Marketing Materials", icon: FileDown },
   { href: "/admin/users", label: "Manage Users", icon: Users },
+  { href: "/admin/notifications", label: "Send Alerts", icon: Bell },
 ];
 
 const enrollmentLinks = [
