@@ -11,6 +11,7 @@ export interface Shop {
   steer_shop_id: string | null;
   autoops_shop_id: string | null;
   program_status: ProgramStatus;
+  printer: string | null;
   sent_welcome_packet_at: string | null;
   loyalty_points_balance: number;
   created_at: string;
@@ -25,6 +26,7 @@ export interface User {
   last_name: string;
   phone: string | null;
   role: UserRole;
+  registration_pending: boolean;
   created_at: string;
 }
 

@@ -97,16 +97,21 @@ export default function EnrollmentPage() {
             <div className="flex justify-center mb-4">
               <Clock className="h-16 w-16 text-yellow-500" />
             </div>
-            <CardTitle className="text-2xl"><h1>Application Under Review</h1></CardTitle>
+            <CardTitle className="text-2xl"><h1>Thanks &mdash; your application is under review</h1></CardTitle>
             <CardDescription>
-              Your initial invoice has been submitted. An admin will review and
-              approve your enrollment shortly.
+              Your initial invoice has been submitted and your enrollment is in
+              our queue. We will review your initial invoice and your account
+              information within the next <strong>24 business hours</strong>.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Badge variant="outline" className="border-yellow-500 text-yellow-700">
               Pending Review
             </Badge>
+            <p className="text-sm text-muted-foreground">
+              No action is needed from you right now. We&apos;ll notify you as
+              soon as your shop is approved for the Premium Growth Portal.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -148,6 +153,13 @@ export default function EnrollmentPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-6 flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+            <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Your initial invoice must be <strong>dated within the last 90
+              days</strong> to qualify.
+            </p>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="amount">Invoice Amount ($)</Label>

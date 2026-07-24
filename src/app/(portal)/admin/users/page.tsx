@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Mail, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Mail, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { userFullName } from "@/lib/utils";
 import type { User, UserRole } from "@/types/database";
 
@@ -95,6 +95,7 @@ export default function AdminUsersPage() {
     text: string;
   } | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const [usersRes, shopsRes] = await Promise.all([
@@ -204,6 +205,27 @@ export default function AdminUsersPage() {
     setNotice({ kind: "success", text: `Setup email sent to ${user.email}.` });
   };
 
+  const handleApprove = async (user: AdminUser) => {
+    setApprovingId(user.id);
+    setNotice(null);
+
+    const res = await fetch(`/api/users/${user.id}/approve-registration`, {
+      method: "POST",
+    });
+    const body = await res.json().catch(() => null);
+    setApprovingId(null);
+
+    if (!res.ok) {
+      setNotice({ kind: "warning", text: formatApiError(body?.error) });
+      return;
+    }
+    setNotice({
+      kind: "success",
+      text: `Registration approved — setup email sent to ${user.email}.`,
+    });
+    fetchData();
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -290,6 +312,14 @@ export default function AdminUsersPage() {
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
                       {userFullName(user)}
+                      {user.registration_pending && (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 border-amber-500 text-amber-700"
+                        >
+                          Pending registration
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.phone || "—"}</TableCell>
@@ -315,6 +345,18 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        {user.registration_pending && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 text-white hover:bg-green-700"
+                            onClick={() => handleApprove(user)}
+                            disabled={approvingId === user.id}
+                            aria-label={`Approve registration for ${userFullName(user)}`}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            {approvingId === user.id ? "Approving..." : "Approve"}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -366,7 +408,7 @@ export default function AdminUsersPage() {
             <DialogDescription>
               {editingUser
                 ? "Update the user's details and shop assignments."
-                : "If the user doesn't have a Steer (Keycloak) account yet, one will be created and they'll receive an email to set their password."}
+                : "If the user doesn't have a Steer account yet, one will be created and they'll receive an email to set their password."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

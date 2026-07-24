@@ -82,7 +82,7 @@ export default async function LoginPage() {
             href="/api/auth/login"
             className="block w-full rounded-md bg-exxon-red px-4 py-2 text-center font-semibold text-white hover:bg-exxon-red-dark"
           >
-            Sign in with Keycloak
+            Sign In
           </a>
         ) : (
           <LoginForm users={users} shopsByUser={shopsByUser} />
