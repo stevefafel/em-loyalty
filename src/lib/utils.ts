@@ -12,6 +12,15 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Format a date-only value (e.g. an extracted invoice date stored as a `@db.Date`
+ * and serialized as midnight-UTC ISO) without shifting it into the viewer's
+ * local timezone — which would render the day before in any zone behind UTC.
+ */
+export function formatDateUTC(value: string | Date): string {
+  return new Date(value).toLocaleDateString("en-US", { timeZone: "UTC" });
+}
+
 export function userFullName(user: {
   first_name: string;
   last_name: string;

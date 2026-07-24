@@ -9,6 +9,7 @@ import {
 
 /**
  * Shops needing admin attention:
+ *  - awaiting program approval (initial invoice uploaded, status "pending"), or
  *  - points balance above ATTENTION_POINTS_THRESHOLD, or
  *  - PEGASUS_THRESHOLD+ oil changes in each of the previous
  *    ATTENTION_STREAK_MONTHS full calendar months (current month excluded), or
@@ -64,6 +65,9 @@ export async function GET() {
         (m) => totals.get(`${shop.id}|${monthKey(m)}`) ?? 0
       );
       const reasons: string[] = [];
+      if (shop.program_status === "pending") {
+        reasons.push("awaiting_approval");
+      }
       if (shop.loyalty_points_balance > ATTENTION_POINTS_THRESHOLD) {
         reasons.push("high_balance");
       }
@@ -76,7 +80,14 @@ export async function GET() {
       return { ...shop, monthlyCounts, reasons };
     })
     .filter((shop) => shop.reasons.length > 0)
-    .sort((a, b) => b.loyalty_points_balance - a.loyalty_points_balance);
+    .sort((a, b) => {
+      // Shops awaiting program approval are on a 24-business-hour clock — float
+      // them to the top, then order the rest by points balance.
+      const aAwait = a.reasons.includes("awaiting_approval") ? 1 : 0;
+      const bAwait = b.reasons.includes("awaiting_approval") ? 1 : 0;
+      if (aAwait !== bAwait) return bAwait - aAwait;
+      return b.loyalty_points_balance - a.loyalty_points_balance;
+    });
 
   return NextResponse.json({
     data: {

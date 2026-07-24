@@ -553,10 +553,10 @@ function AdminDashboard() {
               Shops that Require Attention
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Balance above {ATTENTION_POINTS_THRESHOLD} points,{" "}
-              {PEGASUS_THRESHOLD}+ oil changes in each of the previous{" "}
-              {ATTENTION_STREAK_MONTHS} months, or approved without a welcome
-              packet sent.
+              Awaiting program approval, balance above{" "}
+              {ATTENTION_POINTS_THRESHOLD} points, {PEGASUS_THRESHOLD}+ oil
+              changes in each of the previous {ATTENTION_STREAK_MONTHS} months,
+              or approved without a welcome packet sent.
             </p>
           </div>
           <AlertTriangle className="h-5 w-5 text-yellow-700" />
@@ -616,6 +616,11 @@ function AdminDashboard() {
                     ))}
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
+                        {shop.reasons.includes("awaiting_approval") && (
+                          <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
+                            Awaiting program approval
+                          </Badge>
+                        )}
                         {shop.reasons.includes("high_balance") && (
                           <Badge
                             variant="outline"

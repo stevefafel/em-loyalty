@@ -28,10 +28,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { formatCurrency, formatDateUTC } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
-import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2, Trash2, Pencil, Save } from "lucide-react";
 import type { InvoiceExtraction } from "@/types/database";
+
+interface EditForm {
+  amount: string;
+  vendor_name: string;
+  invoice_number: string;
+  invoice_date: string;
+  subtotal: string;
+  tax_amount: string;
+  total_amount: string;
+}
 
 interface InvoiceWithRelations {
   id: string;
@@ -64,6 +76,12 @@ export default function AdminInvoicesPage() {
   const [actionLoading, setActionLoading] = useState<"approve" | "reject" | null>(null);
   const [extractionData, setExtractionData] = useState<InvoiceExtraction | null>(null);
   const [extractionLoading, setExtractionLoading] = useState(false);
+
+  // Manual-override edit state for the AI-extracted panel.
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<InvoiceWithRelations | null>(null);
@@ -108,6 +126,94 @@ export default function AdminInvoicesPage() {
     setPreviewUrl(null);
     setActionLoading(null);
     setExtractionData(null);
+    setEditing(false);
+    setEditForm(null);
+    setEditError("");
+  };
+
+  const startEdit = () => {
+    setEditError("");
+    setEditForm({
+      amount: reviewTarget ? String(reviewTarget.amount) : "",
+      vendor_name: extractionData?.vendor_name ?? "",
+      invoice_number: extractionData?.invoice_number ?? "",
+      invoice_date: extractionData?.invoice_date
+        ? extractionData.invoice_date.slice(0, 10)
+        : "",
+      subtotal:
+        extractionData?.subtotal != null ? String(extractionData.subtotal) : "",
+      tax_amount:
+        extractionData?.tax_amount != null
+          ? String(extractionData.tax_amount)
+          : "",
+      total_amount:
+        extractionData?.total_amount != null
+          ? String(extractionData.total_amount)
+          : "",
+    });
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditForm(null);
+    setEditError("");
+  };
+
+  const updateEdit = (key: keyof EditForm) => (value: string) =>
+    setEditForm((f) => (f ? { ...f, [key]: value } : f));
+
+  const saveEdit = async () => {
+    if (!reviewTarget || !editForm) return;
+    setSavingEdit(true);
+    setEditError("");
+
+    const numOrNull = (s: string) => {
+      const t = s.trim();
+      if (t === "") return null;
+      const n = parseFloat(t);
+      return isNaN(n) ? null : n;
+    };
+
+    const amountNum = parseFloat(editForm.amount);
+    const body: { amount?: number; extraction: Record<string, unknown> } = {
+      extraction: {
+        vendor_name: editForm.vendor_name.trim() || null,
+        invoice_number: editForm.invoice_number.trim() || null,
+        invoice_date: editForm.invoice_date || null,
+        subtotal: numOrNull(editForm.subtotal),
+        tax_amount: numOrNull(editForm.tax_amount),
+        total_amount: numOrNull(editForm.total_amount),
+      },
+    };
+    if (!isNaN(amountNum) && amountNum > 0) body.amount = amountNum;
+
+    const res = await fetch(`/api/invoices/${reviewTarget.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    setSavingEdit(false);
+
+    if (!res.ok) {
+      setEditError(
+        typeof data?.error === "string"
+          ? data.error
+          : "Could not save changes. Please check the values."
+      );
+      return;
+    }
+
+    if (data?.data) {
+      setExtractionData(data.data.extraction || null);
+      setReviewTarget((prev) =>
+        prev ? { ...prev, amount: Number(data.data.amount) } : prev
+      );
+    }
+    setEditing(false);
+    setEditForm(null);
+    fetchInvoices();
   };
 
   const handleApprove = async () => {
@@ -444,11 +550,128 @@ export default function AdminInvoicesPage() {
 
             {/* Right: AI-extracted data panel */}
             <div className="w-80 shrink-0 overflow-y-auto border rounded-md p-4 space-y-4">
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <Bot className="h-4 w-4" />
-                AI-Extracted Data
-              </h3>
-              {extractionLoading ? (
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Bot className="h-4 w-4" />
+                  AI-Extracted Data
+                </h3>
+                {!editing &&
+                  !extractionLoading &&
+                  extractionData?.status !== "processing" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2"
+                      onClick={startEdit}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+              </div>
+              {editing && editForm ? (
+                <div className="space-y-3 text-sm">
+                  <p className="text-xs text-muted-foreground">
+                    Override the values detected by the AI. The invoice amount
+                    below is what the program uses for approval and Stock-Up.
+                  </p>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-amount">Invoice amount ($)</Label>
+                    <Input
+                      id="edit-amount"
+                      type="number"
+                      step="0.01"
+                      value={editForm.amount}
+                      onChange={(e) => updateEdit("amount")(e.target.value)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-vendor">Vendor</Label>
+                    <Input
+                      id="edit-vendor"
+                      value={editForm.vendor_name}
+                      onChange={(e) => updateEdit("vendor_name")(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-number">Invoice #</Label>
+                    <Input
+                      id="edit-number"
+                      value={editForm.invoice_number}
+                      onChange={(e) =>
+                        updateEdit("invoice_number")(e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-date">Invoice date</Label>
+                    <Input
+                      id="edit-date"
+                      type="date"
+                      value={editForm.invoice_date}
+                      onChange={(e) =>
+                        updateEdit("invoice_date")(e.target.value)
+                      }
+                    />
+                  </div>
+                  <Separator />
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-subtotal">Subtotal ($)</Label>
+                    <Input
+                      id="edit-subtotal"
+                      type="number"
+                      step="0.01"
+                      value={editForm.subtotal}
+                      onChange={(e) => updateEdit("subtotal")(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-tax">Tax ($)</Label>
+                    <Input
+                      id="edit-tax"
+                      type="number"
+                      step="0.01"
+                      value={editForm.tax_amount}
+                      onChange={(e) => updateEdit("tax_amount")(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-total">Total ($)</Label>
+                    <Input
+                      id="edit-total"
+                      type="number"
+                      step="0.01"
+                      value={editForm.total_amount}
+                      onChange={(e) =>
+                        updateEdit("total_amount")(e.target.value)
+                      }
+                    />
+                  </div>
+                  {editError && (
+                    <p className="text-xs text-red-500">{editError}</p>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-exxon-red text-white hover:bg-exxon-red-dark"
+                      onClick={saveEdit}
+                      disabled={savingEdit}
+                    >
+                      <Save className="h-3.5 w-3.5 mr-1" />
+                      {savingEdit ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={cancelEdit}
+                      disabled={savingEdit}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : extractionLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading...
@@ -506,7 +729,7 @@ export default function AdminInvoicesPage() {
                     <div>
                       <span className="text-muted-foreground">Date:</span>{" "}
                       {extractionData.invoice_date
-                        ? new Date(extractionData.invoice_date).toLocaleDateString()
+                        ? formatDateUTC(extractionData.invoice_date)
                         : "N/A"}
                     </div>
                   </div>
