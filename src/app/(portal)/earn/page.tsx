@@ -39,7 +39,7 @@ import {
   aggregateOilChangesByMonth,
   computePegasusStatus,
 } from "@/lib/pegasus";
-import { Plus, Award, FileText, BookOpen, Upload, RefreshCw, GraduationCap, Eye } from "lucide-react";
+import { Plus, Award, FileText, BookOpen, Upload, GraduationCap, Eye } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -250,14 +250,10 @@ export default function EarnAndTrackPage() {
       </Card>
 
       {/* CTA Buttons */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
         <Button className="bg-exxon-red text-white hover:bg-exxon-red-dark h-auto py-2.5 px-3" onClick={() => setDialogOpen(true)}>
           <Upload className="h-4 w-4 mr-2" />
           Upload Invoice
-        </Button>
-        <Button variant="outline" className="border-exxon-blue text-exxon-blue hover:bg-exxon-blue/5 h-auto py-2.5 px-3">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Sync Oil Change Data
         </Button>
         <Button variant="outline" className="border-exxon-red text-exxon-red hover:bg-exxon-red/5 h-auto py-2.5 px-3" asChild>
           <Link href="/training">

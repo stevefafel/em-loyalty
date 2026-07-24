@@ -25,7 +25,6 @@ import {
   Upload,
   Droplets,
   Gift,
-  RefreshCw,
   ShoppingCart,
   Check,
   AlertTriangle,
@@ -40,6 +39,7 @@ import {
   aggregateOilChangesByMonth,
   computePegasusStatus,
 } from "@/lib/pegasus";
+import { totalStockUpPromotions } from "@/lib/stock-up";
 
 export default function DashboardPage() {
   const { isAdmin } = useAuth();
@@ -59,15 +59,17 @@ function ShopDashboard() {
   const [trainingCount, setTrainingCount] = useState<number | null>(null);
   const [ledger, setLedger] = useState<LoyaltyLedgerEntry[]>([]);
   const [oilChanges, setOilChanges] = useState<OilChangeCount[]>([]);
+  const [stockUpPromotions, setStockUpPromotions] = useState(0);
   const [pointsView, setPointsView] = useState<PointsView>("current");
 
   const fetchStats = useCallback(async () => {
     if (!activeShop) return;
 
-    const [trainingRes, ledgerRes, oilChangesRes] = await Promise.all([
+    const [trainingRes, ledgerRes, oilChangesRes, invoicesRes] = await Promise.all([
       fetch("/api/training"),
       fetch(`/api/points?shop_id=${activeShop.id}`),
       fetch(`/api/oil-changes?shop_id=${activeShop.id}`),
+      fetch(`/api/invoices?shop_id=${activeShop.id}`),
     ]);
 
     if (trainingRes.ok) {
@@ -86,6 +88,11 @@ function ShopDashboard() {
     if (oilChangesRes.ok) {
       const oilChangesData = await oilChangesRes.json();
       setOilChanges(oilChangesData.data || []);
+    }
+
+    if (invoicesRes.ok) {
+      const invoicesData = await invoicesRes.json();
+      setStockUpPromotions(totalStockUpPromotions(invoicesData.data || []));
     }
   }, [activeShop]);
 
@@ -163,7 +170,7 @@ function ShopDashboard() {
       </div>
 
       {/* CTA Buttons row */}
-      <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 grid-cols-2 lg:grid-cols-3">
         <Button asChild className="bg-exxon-red text-white hover:bg-exxon-red-dark h-auto py-2 px-3">
           <Link href="/earn" className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
@@ -174,12 +181,6 @@ function ShopDashboard() {
           <Link href="/rewards" className="flex items-center gap-2">
             <Gift className="h-5 w-5" />
             <span className="font-semibold">Redeem Points</span>
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="border-exxon-blue text-exxon-blue hover:bg-exxon-blue/5 h-auto py-2 px-3">
-          <Link href="/earn" className="flex items-center gap-2">
-            <RefreshCw className="h-5 w-5" />
-            <span className="font-semibold">Sync Oil Change Data</span>
           </Link>
         </Button>
         <Button asChild variant="outline" className="border-exxon-red text-exxon-red hover:bg-exxon-red/5 h-auto py-2 px-3">
@@ -202,7 +203,7 @@ function ShopDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {ledger.filter((e) => e.type === "credit" && e.description?.toLowerCase().includes("invoice")).length}
+              {stockUpPromotions}
             </div>
             <p className="text-xs text-muted-foreground mt-1">cumulative earned</p>
           </CardContent>
