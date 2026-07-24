@@ -74,6 +74,7 @@ model Shop {
   loyalty_ledger    LoyaltyLedger[]
   oil_change_counts OilChangeCount[]
   pegasus_awards    PegasusAward[]
+  notifications     Notification[]
 
   @@index([program_status])
   @@map("shops")
@@ -279,4 +280,22 @@ model LoyaltyLedger {
 
   @@index([shop_id])
   @@map("loyalty_ledger")
+}
+
+// In-app alerts shown in the header bell. Scoped to a shop (the program is
+// shop-centric; the bell shows alerts for the active shop). read_at is a single
+// per-shop flag — adequate for the typical one-owner-per-shop case.
+model Notification {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shop_id    String    @db.Uuid
+  type       String
+  title      String
+  body       String
+  read_at    DateTime? @db.Timestamptz()
+  created_at DateTime  @default(now()) @db.Timestamptz()
+
+  shop Shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@index([shop_id])
+  @@map("notifications")
 }

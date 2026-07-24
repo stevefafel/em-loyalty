@@ -1,12 +1,108 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useShop } from "@/context/shop-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ShopSwitcher } from "./shop-switcher";
 import { userFullName } from "@/lib/utils";
 import { LogOut, CalendarDays, Bell } from "lucide-react";
+import type { Notification as AppNotification } from "@/types/database";
+
+function NotificationBell({ shopId }: { shopId: string | null }) {
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+
+  const load = useCallback(async () => {
+    if (!shopId) {
+      setItems([]);
+      setUnread(0);
+      return;
+    }
+    const res = await fetch(`/api/notifications?shop_id=${shopId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setItems(data.data || []);
+    setUnread(data.unread || 0);
+  }, [shopId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Opening the bell marks everything read.
+  const handleOpenChange = async (open: boolean) => {
+    if (!open || unread === 0 || !shopId) return;
+    setUnread(0);
+    setItems((prev) =>
+      prev.map((n) =>
+        n.read_at ? n : { ...n, read_at: new Date().toISOString() }
+      )
+    );
+    await fetch("/api/notifications/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shop_id: shopId }),
+    }).catch(() => {});
+  };
+
+  return (
+    <DropdownMenu onOpenChange={handleOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="relative text-exxon-gray hover:text-exxon-charcoal"
+          aria-label={`Notifications, ${unread} unread`}
+        >
+          <Bell className="h-4.5 w-4.5" />
+          {unread > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-exxon-red text-[10px] font-bold text-white"
+            >
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {items.length === 0 ? (
+          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+            You&apos;re all caught up.
+          </div>
+        ) : (
+          <div className="max-h-96 overflow-y-auto">
+            {items.map((n) => (
+              <div
+                key={n.id}
+                className={`border-b px-3 py-2 text-sm last:border-b-0 ${
+                  n.read_at ? "" : "bg-exxon-red/5"
+                }`}
+              >
+                <p className="font-semibold text-exxon-charcoal">{n.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {new Date(n.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Header() {
   const { user, isAdmin, logout } = useAuth();
@@ -62,21 +158,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="relative text-exxon-gray hover:text-exxon-charcoal"
-          onClick={() => {}}
-          aria-label="Notifications, 0 unread"
-        >
-          <Bell className="h-4.5 w-4.5" />
-          <span
-            aria-hidden="true"
-            className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-exxon-red text-[10px] font-bold text-white"
-          >
-            0
-          </span>
-        </Button>
+        <NotificationBell shopId={activeShop?.id ?? null} />
         <ShopSwitcher />
         <Badge
           className={

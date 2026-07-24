@@ -144,3 +144,13 @@ export interface OilChangeCount {
   created_at: string;
   updated_at: string;
 }
+
+export interface Notification {
+  id: string;
+  shop_id: string;
+  type: string;
+  title: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+}

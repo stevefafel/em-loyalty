@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { SHOP_APPROVED_NOTIFICATION } from "@/lib/notifications";
 
 export async function POST(
   req: NextRequest,
@@ -39,6 +40,13 @@ export async function POST(
           prisma.shop.update({
             where: { id: invoice.shop_id },
             data: { program_status: "approved", updated_at: new Date() },
+          }),
+          // Congratulate the shop on acceptance into the program.
+          prisma.notification.create({
+            data: {
+              shop_id: invoice.shop_id,
+              ...SHOP_APPROVED_NOTIFICATION,
+            },
           }),
         ]
       : []),
