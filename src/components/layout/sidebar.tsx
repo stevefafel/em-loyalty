@@ -20,6 +20,7 @@ import {
   Handshake,
   Droplets,
   Bell,
+  LifeBuoy,
 } from "lucide-react";
 
 const shopUserLinks = [
@@ -29,6 +30,7 @@ const shopUserLinks = [
   { href: "/training", label: "Training", icon: GraduationCap },
   { href: "/collateral", label: "Marketing Materials", icon: FileDown },
   { href: "/partners", label: "Technology Providers", icon: Handshake },
+  { href: "/support", label: "Support", icon: LifeBuoy },
 ];
 
 const adminLinks = [
@@ -42,8 +44,12 @@ const adminLinks = [
   { href: "/admin/notifications", label: "Send Alerts", icon: Bell },
 ];
 
+// Support is deliberately in both link sets (KTD7): the sidebar swaps entire
+// sets by program status, so a shop that is new, pending or rejected would
+// otherwise lose the one page it needs most.
 const enrollmentLinks = [
   { href: "/enrollment", label: "Enrollment", icon: Upload },
+  { href: "/support", label: "Support", icon: LifeBuoy },
 ];
 
 const partnerLinks = [
