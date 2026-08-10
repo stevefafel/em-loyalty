@@ -39,7 +39,7 @@ import {
   aggregateOilChangesByMonth,
   computePegasusStatus,
 } from "@/lib/pegasus";
-import { totalStockUpPromotions } from "@/lib/stock-up";
+import { stockUpPromotionBenefit, stockUpPromotionCount } from "@/lib/stock-up";
 
 export default function DashboardPage() {
   const { isAdmin } = useAuth();
@@ -59,7 +59,8 @@ function ShopDashboard() {
   const [trainingCount, setTrainingCount] = useState<number | null>(null);
   const [ledger, setLedger] = useState<LoyaltyLedgerEntry[]>([]);
   const [oilChanges, setOilChanges] = useState<OilChangeCount[]>([]);
-  const [stockUpPromotions, setStockUpPromotions] = useState(0);
+  const [stockUpCount, setStockUpCount] = useState(0);
+  const [stockUpBenefit, setStockUpBenefit] = useState(0);
   const [pointsView, setPointsView] = useState<PointsView>("current");
 
   const fetchStats = useCallback(async () => {
@@ -92,7 +93,9 @@ function ShopDashboard() {
 
     if (invoicesRes.ok) {
       const invoicesData = await invoicesRes.json();
-      setStockUpPromotions(totalStockUpPromotions(invoicesData.data || []));
+      const invoices = invoicesData.data || [];
+      setStockUpCount(stockUpPromotionCount(invoices));
+      setStockUpBenefit(stockUpPromotionBenefit(invoices));
     }
   }, [activeShop]);
 
@@ -191,19 +194,35 @@ function ShopDashboard() {
         </Button>
       </div>
 
-      {/* Stat tiles — 4 tiles: Stock-up on far left, then PG points, Oil changes, Training */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Stock-up Promotions (cumulative) */}
+      {/* Stat tiles — 5 tiles: Stock-Up count + benefit, then PG points, Oil changes, Training */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {/* Stock-Up Promotion Count — approved invoice uploads */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Stock-Up Promotions
+              Stock-Up Promotion Count
             </CardTitle>
             <ShoppingCart className="h-5 w-5 text-exxon-red" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {stockUpPromotions}
+              {stockUpCount}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">approved invoices</p>
+          </CardContent>
+        </Card>
+
+        {/* Stock-Up Promotion Benefit — whole $500 units across approved invoices */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Stock-Up Promotion Benefit
+            </CardTitle>
+            <ShoppingCart className="h-5 w-5 text-exxon-blue" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {stockUpBenefit}
             </div>
             <p className="text-xs text-muted-foreground mt-1">cumulative earned</p>
           </CardContent>

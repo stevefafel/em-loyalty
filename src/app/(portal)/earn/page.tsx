@@ -39,7 +39,7 @@ import {
   aggregateOilChangesByMonth,
   computePegasusStatus,
 } from "@/lib/pegasus";
-import { Plus, Award, FileText, BookOpen, Upload, GraduationCap, Eye } from "lucide-react";
+import { Plus, Award, FileText, BookOpen, Upload, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -250,7 +250,7 @@ export default function EarnAndTrackPage() {
       </Card>
 
       {/* CTA Buttons */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2">
         <Button className="bg-exxon-red text-white hover:bg-exxon-red-dark h-auto py-2.5 px-3" onClick={() => setDialogOpen(true)}>
           <Upload className="h-4 w-4 mr-2" />
           Upload Invoice
@@ -259,12 +259,6 @@ export default function EarnAndTrackPage() {
           <Link href="/training">
             <GraduationCap className="h-4 w-4 mr-2" />
             Complete Training
-          </Link>
-        </Button>
-        <Button variant="outline" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 h-auto py-2.5 px-3" asChild>
-          <Link href="/dashboard">
-            <Eye className="h-4 w-4 mr-2" />
-            View Tier Status
           </Link>
         </Button>
       </div>

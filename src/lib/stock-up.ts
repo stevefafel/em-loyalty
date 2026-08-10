@@ -1,21 +1,38 @@
-// Stock-Up promotions are a countable metric (separate from loyalty points).
-// An invoice earns one Stock-Up promotion for every whole $500 of its amount,
-// rounded down: <$500 → 0, $500–$999.99 → 1, $1,567 → 3. A shop's total is the
-// sum across its APPROVED invoices only (initial + subsequent alike).
+// Stock-Up promotions are countable metrics, separate from loyalty points.
+// Two distinct numbers, both derived from a shop's APPROVED invoices:
+//
+//   COUNT   — how many approved invoice uploads the shop has. One per approved
+//             invoice, regardless of amount.
+//   BENEFIT — how many whole $500 units those invoices clear, rounded down:
+//             <$500 → 0, $500–$999.99 → 1, $1,567 → 3.
+//
+// A $100 approved invoice is count 1, benefit 0 — that difference is the whole
+// point of tracking them separately. Both count initial and subsequent
+// invoices alike, and only once the invoice is approved.
 
 export const STOCK_UP_UNIT = 500;
 
-/** Whole-$500 Stock-Up promotions earned by a single invoice amount (rounded down). */
-export function stockUpPromotionsForAmount(amount: number): number {
+interface StockUpInvoice {
+  amount: number;
+  status: string;
+}
+
+const isApproved = (inv: StockUpInvoice) => inv.status === "approved";
+
+/** Whole-$500 Stock-Up benefit units earned by a single invoice amount (rounded down). */
+export function stockUpBenefitForAmount(amount: number): number {
   if (!Number.isFinite(amount) || amount < STOCK_UP_UNIT) return 0;
   return Math.floor(amount / STOCK_UP_UNIT);
 }
 
-/** Total Stock-Up promotions across a shop's invoices, counting approved ones only. */
-export function totalStockUpPromotions(
-  invoices: { amount: number; status: string }[]
-): number {
+/** Stock-Up Promotion Count: a shop's approved invoice uploads. */
+export function stockUpPromotionCount(invoices: StockUpInvoice[]): number {
+  return invoices.filter(isApproved).length;
+}
+
+/** Stock-Up Promotion Benefit: total $500 units across a shop's approved invoices. */
+export function stockUpPromotionBenefit(invoices: StockUpInvoice[]): number {
   return invoices
-    .filter((inv) => inv.status === "approved")
-    .reduce((sum, inv) => sum + stockUpPromotionsForAmount(inv.amount), 0);
+    .filter(isApproved)
+    .reduce((sum, inv) => sum + stockUpBenefitForAmount(inv.amount), 0);
 }
