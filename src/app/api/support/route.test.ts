@@ -231,6 +231,17 @@ describe("POST /api/support", () => {
     expect(createConversation).not.toHaveBeenCalled();
   });
 
+  it("returns 404 when the opener's user row is missing", async () => {
+    getSession.mockResolvedValue(SHOP_SESSION);
+    findUser.mockResolvedValue(null);
+    const { POST } = await loadRoute();
+
+    const res = await POST(postReq({ subject: "Hi", body: "Help" }));
+
+    expect(res.status).toBe(404);
+    expect(createConversation).not.toHaveBeenCalled();
+  });
+
   it("creates an open conversation plus exactly one message, shop taken from the session", async () => {
     getSession.mockResolvedValue(SHOP_SESSION);
     const { POST } = await loadRoute();

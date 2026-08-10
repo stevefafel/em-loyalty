@@ -22,6 +22,13 @@ export async function GET(
 
   const { id } = await params;
 
+  // Taken before the read, not after: a stamp written from an later clock read
+  // would acknowledge messages that landed while this query was in flight and
+  // were never returned to the caller, silently clearing an unread signal
+  // nobody saw. Anything arriving after this instant stays strictly newer than
+  // the stamp and remains unread.
+  const now = new Date();
+
   const conversation = await prisma.supportConversation.findUnique({
     where: { id },
     include: {
@@ -40,7 +47,6 @@ export async function GET(
   // KTD6: read stamps live on the conversation, one per side, and are set when
   // that side opens *this* thread. Only the caller's side moves; updated_at is
   // deliberately untouched so reading never reorders the queue.
-  const now = new Date();
   const readStamp =
     session.role === "admin" ? { admin_read_at: now } : { shop_read_at: now };
 

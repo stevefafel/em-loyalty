@@ -6,6 +6,12 @@ import { supportReplyNotification } from "@/lib/notifications";
 import { supportMessageCreateSchema } from "@/lib/validators/support";
 
 /**
+ * Raised inside the write transaction when the conversation was closed between
+ * the pre-flight guard and the write, so the message rolls back with it.
+ */
+class ConversationClosedError extends Error {}
+
+/**
  * Append a reply to a thread. Either side may reply; the author is always taken
  * from the session — role included — and the display name is snapshotted at
  * write time (KTD2), so a client-supplied author is ignored entirely.
@@ -84,10 +90,17 @@ export async function POST(
     });
 
     // The schema has no @updatedAt, so the queue's ordering is maintained here.
-    await tx.supportConversation.update({
-      where: { id: conversation.id },
+    // Scoped to status "open" so the terminal guard is enforced by the write
+    // itself: a close committing after the pre-flight check above matches zero
+    // rows here and rolls the message back, rather than stranding a reply on a
+    // closed thread that neither side can see a way to answer.
+    const { count } = await tx.supportConversation.updateMany({
+      where: { id: conversation.id, status: "open" },
       data: { updated_at: now },
     });
+    if (count === 0) {
+      throw new ConversationClosedError();
+    }
 
     // R10: an admin reply alerts the shop through the existing bell. A shop
     // reply writes nothing — admin-side alerting is derived, not stored (KTD3).
@@ -101,7 +114,19 @@ export async function POST(
     }
 
     return created;
+  }).catch((err) => {
+    if (err instanceof ConversationClosedError) return null;
+    throw err;
   });
+
+  // The thread closed underneath this reply; report it exactly as the
+  // pre-flight guard would have.
+  if (!message) {
+    return NextResponse.json(
+      { error: "Conversation is closed" },
+      { status: 400 }
+    );
+  }
 
   return NextResponse.json({ data: message }, { status: 201 });
 }

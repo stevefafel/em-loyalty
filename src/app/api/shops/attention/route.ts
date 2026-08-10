@@ -55,7 +55,13 @@ export async function GET() {
       where: { date: { gte: monthStarts[0], lt: currentMonthStart } },
       select: { shop_id: true, date: true, count: true },
     }),
-    prisma.supportConversation.findMany(awaitingAdminResponseQuery),
+    // Isolated: support is the newest and least critical reason here. Sharing
+    // a Promise.all rejection with the shop and oil-change queries would let a
+    // support failure blank the whole attention list, taking program approvals
+    // — which run on a 24-business-hour clock — down with it.
+    prisma.supportConversation
+      .findMany(awaitingAdminResponseQuery)
+      .catch(() => []),
   ]);
 
   // One shop with two waiting threads earns the reason once, not twice.

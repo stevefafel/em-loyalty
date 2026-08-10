@@ -85,7 +85,11 @@ export function Sidebar() {
     return () => {
       active = false;
     };
-  }, [isAdmin]);
+    // pathname is a dependency on purpose: the portal layout persists across
+    // client-side navigation, so mounting alone would freeze this count for the
+    // whole session — an admin who answered every thread would still see a
+    // stale badge. Re-deriving per navigation keeps the no-polling constraint.
+  }, [isAdmin, pathname]);
 
   const isApproved =
     activeShop?.program_status === PROGRAM_STATUS.APPROVED;

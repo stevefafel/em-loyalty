@@ -20,7 +20,9 @@ vi.mock("@/lib/prisma", () => ({
       fn({
         supportMessage: { create: (...a: unknown[]) => createMessage(...a) },
         supportConversation: {
-          update: (...a: unknown[]) => updateConversation(...a),
+          // updateMany, not update: the bump is scoped to status "open" so it
+          // doubles as the terminal guard inside the transaction.
+          updateMany: (...a: unknown[]) => updateConversation(...a),
         },
         notification: { create: (...a: unknown[]) => createNotification(...a) },
       }),
@@ -85,7 +87,8 @@ beforeEach(() => {
     id: "m-new",
     ...data,
   }));
-  updateConversation.mockResolvedValue(conversation());
+  // One row matched: the conversation was still open at write time.
+  updateConversation.mockResolvedValue({ count: 1 });
   createNotification.mockResolvedValue({ id: "n-new" });
 });
 afterEach(() => vi.resetModules());
@@ -145,8 +148,35 @@ describe("POST /api/support/[id]/messages", () => {
 
     expect(updateConversation).toHaveBeenCalledTimes(1);
     const call = updateConversation.mock.calls[0][0];
-    expect(call.where).toEqual({ id: "c1" });
+    // Scoped to open, so the same statement enforces the terminal guard.
+    expect(call.where).toEqual({ id: "c1", status: "open" });
     expect(call.data.updated_at).toBeInstanceOf(Date);
+  });
+
+  it("rejects a reply when the thread closes between the guard and the write", async () => {
+    // The pre-flight guard saw an open thread, but a close committed before the
+    // transaction ran, so the scoped bump matches no rows.
+    getSession.mockResolvedValue(SHOP_SESSION);
+    updateConversation.mockResolvedValue({ count: 0 });
+    const { POST } = await loadRoute();
+
+    const res = await POST(postReq({ body: "Slipped through?" }), ctx());
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("Conversation is closed");
+  });
+
+  it("returns 404 when the author's user row is missing", async () => {
+    getSession.mockResolvedValue(SHOP_SESSION);
+    findUser.mockResolvedValue(null);
+    const { POST } = await loadRoute();
+
+    const res = await POST(postReq({ body: "Hello?" }), ctx());
+
+    expect(res.status).toBe(404);
+    expect(createMessage).not.toHaveBeenCalled();
+    expect(updateConversation).not.toHaveBeenCalled();
+    expect(createNotification).not.toHaveBeenCalled();
   });
 
   it("takes the author from the session even when the body supplies another", async () => {
