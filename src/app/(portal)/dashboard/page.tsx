@@ -665,6 +665,14 @@ function AdminDashboard() {
                             Welcome packet not sent
                           </Badge>
                         )}
+                        {shop.reasons.includes("open_support_request") && (
+                          <Badge
+                            variant="outline"
+                            className="border-exxon-blue text-exxon-blue"
+                          >
+                            Support question waiting
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

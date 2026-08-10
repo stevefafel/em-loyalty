@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
@@ -42,7 +43,11 @@ const adminLinks = [
   { href: "/admin/collateral", label: "Marketing Materials", icon: FileDown },
   { href: "/admin/users", label: "Manage Users", icon: Users },
   { href: "/admin/notifications", label: "Send Alerts", icon: Bell },
+  { href: "/admin/support", label: "Support", icon: LifeBuoy },
 ];
+
+/** The one link that carries a count badge — the admin support inbox (R11). */
+const SUPPORT_INBOX_HREF = "/admin/support";
 
 // Support is deliberately in both link sets (KTD7): the sidebar swaps entire
 // sets by program status, so a shop that is new, pending or rejected would
@@ -61,6 +66,26 @@ export function Sidebar() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
   const { activeShop } = useShop();
+
+  // How many conversations are waiting on an admin (R11). One fetch on mount,
+  // mirroring NotificationBell — deliberately no polling, so the count refreshes
+  // on navigation rather than on a timer.
+  const [awaitingSupport, setAwaitingSupport] = useState(0);
+
+  useEffect(() => {
+    // Only admins have the inbox link, so a non-admin simply never fetches.
+    if (!isAdmin) return;
+    let active = true;
+    (async () => {
+      const res = await fetch("/api/support/awaiting").catch(() => null);
+      if (!res || !res.ok) return;
+      const json = await res.json().catch(() => null);
+      if (active) setAwaitingSupport(json?.data?.count || 0);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isAdmin]);
 
   const isApproved =
     activeShop?.program_status === PROGRAM_STATUS.APPROVED;
@@ -102,7 +127,13 @@ export function Sidebar() {
               )}
             >
               <link.icon aria-hidden="true" className="h-4.5 w-4.5" />
-              {link.label}
+              <span className="flex-1">{link.label}</span>
+              {link.href === SUPPORT_INBOX_HREF && awaitingSupport > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-exxon-red px-1 text-[10px] font-bold text-white">
+                  {awaitingSupport > 9 ? "9+" : awaitingSupport}
+                  <span className="sr-only"> awaiting a reply</span>
+                </span>
+              )}
             </Link>
           );
         })}
