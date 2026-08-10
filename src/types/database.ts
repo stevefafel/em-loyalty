@@ -154,3 +154,28 @@ export interface Notification {
   read_at: string | null;
   created_at: string;
 }
+
+export type SupportConversationStatus = "open" | "closed";
+
+export interface SupportConversation {
+  id: string;
+  shop_id: string;
+  opened_by_user_id: string;
+  subject: string;
+  status: SupportConversationStatus;
+  shop_read_at: string | null;
+  admin_read_at: string | null;
+  created_at: string;
+  updated_at: string;
+  messages?: SupportMessage[];
+}
+
+export interface SupportMessage {
+  id: string;
+  conversation_id: string;
+  author_user_id: string;
+  author_role: UserRole;
+  author_name: string;
+  body: string;
+  created_at: string;
+}

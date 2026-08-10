@@ -48,6 +48,13 @@ enum ExtractionStatus {
   @@map("extraction_status")
 }
 
+enum SupportConversationStatus {
+  open
+  closed
+
+  @@map("support_conversation_status")
+}
+
 // ── Models ─────────────────────────────────────────────
 
 model Shop {
@@ -67,14 +74,15 @@ model Shop {
   created_at            DateTime      @default(now()) @db.Timestamptz()
   updated_at            DateTime      @default(now()) @db.Timestamptz()
 
-  user_shops        UserShop[]
-  invoices          Invoice[]
-  training_logs     TrainingLog[]
-  collateral_logs   CollateralLog[]
-  loyalty_ledger    LoyaltyLedger[]
-  oil_change_counts OilChangeCount[]
-  pegasus_awards    PegasusAward[]
-  notifications     Notification[]
+  user_shops            UserShop[]
+  invoices              Invoice[]
+  training_logs         TrainingLog[]
+  collateral_logs       CollateralLog[]
+  loyalty_ledger        LoyaltyLedger[]
+  oil_change_counts     OilChangeCount[]
+  pegasus_awards        PegasusAward[]
+  notifications         Notification[]
+  support_conversations SupportConversation[]
 
   @@index([program_status])
   @@map("shops")
@@ -298,4 +306,46 @@ model Notification {
 
   @@index([shop_id])
   @@map("notifications")
+}
+
+// A support thread between one shop and the portal admins. shop_read_at /
+// admin_read_at are per-side read stamps (nullable = never read), following the
+// same single-flag-per-side simplification as Notification.read_at.
+model SupportConversation {
+  id                String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shop_id           String                    @db.Uuid
+  // Plain UUID, no relation: users are deleted with cascade, and a departed
+  // user must not take the conversation with them.
+  opened_by_user_id String                    @db.Uuid
+  subject           String
+  status            SupportConversationStatus @default(open)
+  shop_read_at      DateTime?                 @db.Timestamptz()
+  admin_read_at     DateTime?                 @db.Timestamptz()
+  created_at        DateTime                  @default(now()) @db.Timestamptz()
+  updated_at        DateTime                  @default(now()) @db.Timestamptz()
+
+  shop     Shop             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([shop_id])
+  @@index([status])
+  @@map("support_conversations")
+}
+
+// One message in a support thread. The author is denormalized (no User
+// relation) so deleting a user never removes their replies from a thread the
+// shop can still read; author_name is a snapshot taken at write time.
+model SupportMessage {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id String   @db.Uuid
+  author_user_id  String   @db.Uuid
+  author_role     UserRole
+  author_name     String
+  body            String
+  created_at      DateTime @default(now()) @db.Timestamptz()
+
+  conversation SupportConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id])
+  @@map("support_messages")
 }
