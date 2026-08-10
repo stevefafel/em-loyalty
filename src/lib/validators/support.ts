@@ -18,3 +18,20 @@ export const supportConversationCreateSchema = z.object({
 export type SupportConversationCreateInput = z.infer<
   typeof supportConversationCreateSchema
 >;
+
+/**
+ * A reply appended to an existing thread. Body only: the author is always
+ * derived from the session and snapshotted at write time (KTD2), never taken
+ * from the client.
+ */
+export const supportMessageCreateSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, "Message is required")
+    .max(5000, "Keep the message under 5000 characters"),
+});
+
+export type SupportMessageCreateInput = z.infer<
+  typeof supportMessageCreateSchema
+>;
