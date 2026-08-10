@@ -48,6 +48,7 @@ describe("computePegasusBonusMonths", () => {
     const entries = [
       month(2026, 7, 30), // Aug — streak 1
       month(2026, 8, 30), // Sep — streak 2
+      month(2026, 9, 5), // Oct — misses the bar, so no month ever reaches streak 3
     ];
     expect(bonusMonths(entries)).toEqual([]);
   });
@@ -102,6 +103,20 @@ describe("computePegasusBonusMonths", () => {
       month(2026, 5, 30), // Jun — pre-program, streak 2
       month(2026, 6, 30), // Jul — pre-program, streak 3 (would pay, but pre-program)
       month(2026, 7, 30), // Aug — streak 4 → first payable month
+    ];
+    expect(bonusMonths(entries, new Date(Date.UTC(2026, 8, 10)))).toEqual([
+      utcMonth(2026, 7).toISOString(),
+    ]);
+  });
+
+  it("pays the program-start month when it is itself the 3rd consecutive month", () => {
+    // The first payout the live program can produce: the streak is built
+    // during pre-program months, and Aug 2026 — PEGASUS_PROGRAM_START — is
+    // the month that reaches streak 3. The >= gate must pay it.
+    const entries = [
+      month(2026, 5, 30), // Jun — pre-program, streak 1
+      month(2026, 6, 30), // Jul — pre-program, streak 2
+      month(2026, 7, 30), // Aug — streak 3 AND the program-start month
     ];
     expect(bonusMonths(entries, new Date(Date.UTC(2026, 8, 10)))).toEqual([
       utcMonth(2026, 7).toISOString(),
