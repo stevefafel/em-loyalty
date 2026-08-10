@@ -44,23 +44,29 @@ describe("stockUpPromotionBenefit", () => {
 });
 
 describe("stockUpPromotionCount", () => {
-  it("counts approved invoices regardless of amount", () => {
+  it("counts each approved invoice that clears the $500 minimum", () => {
     const invoices = [
-      { amount: 1567, status: "approved" },
-      { amount: 500, status: "approved" },
+      { amount: 1567, status: "approved" }, // counts once, not three times
+      { amount: 500, status: "approved" }, // exactly the minimum counts
       { amount: 2000, status: "pending" }, // ignored
       { amount: 900, status: "rejected" }, // ignored
     ];
     expect(stockUpPromotionCount(invoices)).toBe(2);
   });
 
-  it("counts an approved invoice that earns no benefit", () => {
-    // A $100 invoice is still one approved stock-up upload (count 1),
-    // even though it clears no $500 unit (benefit 0). This is exactly the
-    // count-vs-benefit distinction.
-    const invoices = [{ amount: 100, status: "approved" }];
-    expect(stockUpPromotionCount(invoices)).toBe(1);
+  it("does not count an approved invoice below the $500 minimum", () => {
+    // A qualifying invoice is worth exactly one promotion no matter how far
+    // above $500 it lands; below $500 it is worth none. Benefit is the axis
+    // that scales with amount, not count.
+    const invoices = [{ amount: 499.99, status: "approved" }];
+    expect(stockUpPromotionCount(invoices)).toBe(0);
     expect(stockUpPromotionBenefit(invoices)).toBe(0);
+  });
+
+  it("counts one promotion but many benefit units for a large invoice", () => {
+    const invoices = [{ amount: 1567, status: "approved" }];
+    expect(stockUpPromotionCount(invoices)).toBe(1);
+    expect(stockUpPromotionBenefit(invoices)).toBe(3);
   });
 
   it("is zero with no approved invoices", () => {
