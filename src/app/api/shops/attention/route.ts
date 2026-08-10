@@ -6,6 +6,10 @@ import {
   ATTENTION_POINTS_THRESHOLD,
   ATTENTION_STREAK_MONTHS,
 } from "@/lib/constants";
+import {
+  awaitingAdminResponseQuery,
+  shopIdsAwaitingAdminResponse,
+} from "@/lib/support";
 
 /**
  * Shops needing admin attention:
@@ -13,7 +17,8 @@ import {
  *  - points balance above ATTENTION_POINTS_THRESHOLD, or
  *  - PEGASUS_THRESHOLD+ oil changes in each of the previous
  *    ATTENTION_STREAK_MONTHS full calendar months (current month excluded), or
- *  - approved into the program but never sent a welcome packet.
+ *  - approved into the program but never sent a welcome packet, or
+ *  - an open support conversation waiting on an admin reply (R11).
  */
 export async function GET() {
   const session = await getSession();
@@ -36,7 +41,7 @@ export async function GET() {
     Date.UTC(now.getFullYear(), now.getMonth(), 1)
   );
 
-  const [shops, oilChanges] = await Promise.all([
+  const [shops, oilChanges, conversations] = await Promise.all([
     prisma.shop.findMany({
       select: {
         id: true,
@@ -50,7 +55,17 @@ export async function GET() {
       where: { date: { gte: monthStarts[0], lt: currentMonthStart } },
       select: { shop_id: true, date: true, count: true },
     }),
+    // Isolated: support is the newest and least critical reason here. Sharing
+    // a Promise.all rejection with the shop and oil-change queries would let a
+    // support failure blank the whole attention list, taking program approvals
+    // — which run on a 24-business-hour clock — down with it.
+    prisma.supportConversation
+      .findMany(awaitingAdminResponseQuery)
+      .catch(() => []),
   ]);
+
+  // One shop with two waiting threads earns the reason once, not twice.
+  const awaitingSupport = shopIdsAwaitingAdminResponse(conversations);
 
   const monthKey = (d: Date) => `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
   const totals = new Map<string, number>();
@@ -76,6 +91,9 @@ export async function GET() {
       }
       if (shop.program_status === "approved" && !shop.sent_welcome_packet_at) {
         reasons.push("no_welcome_packet");
+      }
+      if (awaitingSupport.has(shop.id)) {
+        reasons.push("open_support_request");
       }
       return { ...shop, monthlyCounts, reasons };
     })
