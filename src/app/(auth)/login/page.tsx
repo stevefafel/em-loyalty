@@ -51,23 +51,26 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-exxon-charcoal overflow-hidden">
+    <div className="relative flex min-h-screen items-center justify-center bg-white overflow-hidden">
       {/* Red accent bar */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-exxon-red" />
 
-      {/* Background Pegasus watermark */}
+      {/* Red Pegasus brand mark — offset to the right, kept fully in frame.
+          Hidden on narrow screens where it would sit under the card. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/mobil-pegasus.svg"
+        src="/Mobil_Pegasus_red_RGB-TM.png"
         alt=""
-        className="absolute right-[-60px] bottom-[-60px] h-80 opacity-[0.04] pointer-events-none"
+        className="absolute right-10 bottom-10 hidden h-52 pointer-events-none lg:block"
       />
 
-      <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-2xl relative z-10">
+      {/* Card keeps a hairline border so it stays distinct from the white page. */}
+      <div className="w-full max-w-md space-y-8 rounded-xl border border-exxon-charcoal/10 bg-white p-8 shadow-xl relative z-10">
         <div className="flex flex-col items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/mobil1-logo.svg" alt="Mobil 1" className="h-12" />
-          <h1 className="text-2xl font-bold text-exxon-charcoal">
+          {/* mt adds to the flex gap, widening only the logo-to-heading gap. */}
+          <h1 className="mt-3 text-2xl font-bold text-exxon-charcoal">
             Premium Growth Program
           </h1>
           <p className="text-sm text-exxon-gray">
@@ -88,11 +91,6 @@ export default async function LoginPage() {
           <LoginForm users={users} shopsByUser={shopsByUser} />
         )}
 
-        {/* Footer branding */}
-        <div className="flex justify-center pt-2 opacity-20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mobil-pegasus.svg" alt="" className="h-6" />
-        </div>
       </div>
     </div>
   );
