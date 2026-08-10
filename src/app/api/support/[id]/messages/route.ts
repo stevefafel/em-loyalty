@@ -37,7 +37,7 @@ export async function POST(
 
   const conversation = await prisma.supportConversation.findUnique({
     where: { id },
-    select: { id: true, shop_id: true, subject: true },
+    select: { id: true, shop_id: true, subject: true, status: true },
   });
 
   // Same scope rule as GET: another shop's thread is 404, never 403 (R13).
@@ -46,6 +46,16 @@ export async function POST(
     (session.role === "user" && conversation.shop_id !== session.shopId)
   ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // R9/KTD5: closed is terminal — neither side may append, mirroring the
+  // already-approved guard on invoice approval. Hiding the composer once a
+  // thread is closed is a courtesy; this check is what actually enforces it.
+  if (conversation.status === "closed") {
+    return NextResponse.json(
+      { error: "Conversation is closed" },
+      { status: 400 }
+    );
   }
 
   const author = await prisma.user.findUnique({

@@ -200,4 +200,38 @@ describe("POST /api/support/[id]/messages", () => {
     expect(res.status).toBe(404);
     expect(createMessage).not.toHaveBeenCalled();
   });
+
+  // R9/KTD5: closed is terminal for messages. The hidden composer is a
+  // courtesy; this rejection is the guarantee, so both roles are proven here.
+  it("rejects a shop reply to a closed conversation with 400", async () => {
+    getSession.mockResolvedValue(SHOP_SESSION);
+    findConversation.mockResolvedValue(conversation({ status: "closed" }));
+    const { POST } = await loadRoute();
+    const res = await POST(postReq({ body: "One more thing" }), ctx());
+
+    expect(res.status).toBe(400);
+    expect(createMessage).not.toHaveBeenCalled();
+    expect(updateConversation).not.toHaveBeenCalled();
+    expect(createNotification).not.toHaveBeenCalled();
+  });
+
+  it("rejects an admin reply to a closed conversation with 400", async () => {
+    getSession.mockResolvedValue(ADMIN_SESSION);
+    findConversation.mockResolvedValue(conversation({ status: "closed" }));
+    const { POST } = await loadRoute();
+    const res = await POST(postReq({ body: "Reopening this" }), ctx());
+
+    expect(res.status).toBe(400);
+    expect(createMessage).not.toHaveBeenCalled();
+    expect(updateConversation).not.toHaveBeenCalled();
+    expect(createNotification).not.toHaveBeenCalled();
+  });
+
+  it("selects the conversation status so the terminal guard can see it", async () => {
+    getSession.mockResolvedValue(SHOP_SESSION);
+    const { POST } = await loadRoute();
+    await POST(postReq({ body: "Any news?" }), ctx());
+
+    expect(findConversation.mock.calls[0][0].select.status).toBe(true);
+  });
 });
