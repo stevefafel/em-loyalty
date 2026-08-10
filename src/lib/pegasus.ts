@@ -57,11 +57,12 @@ export function aggregateOilChangesByMonth(
 /**
  * The completed months (UTC month starts) whose Pegasus bonus is due.
  * Reaching Pegasus mode (the PEGASUS_CONSECUTIVE_MONTHS-th consecutive
- * qualifying month) earns nothing on its own; the bonus is paid for each
- * qualifying month *after* that — i.e. streak strictly greater than
- * PEGASUS_CONSECUTIVE_MONTHS — on or after PEGASUS_PROGRAM_START. The current
- * (in-progress) month never qualifies; months with no data count as zero and
- * break the streak.
+ * qualifying month) pays the bonus, and so does every consecutive qualifying
+ * month after it — i.e. streak >= PEGASUS_CONSECUTIVE_MONTHS — on or after
+ * PEGASUS_PROGRAM_START. Missing the threshold resets the streak to zero, so
+ * the shop must rebuild PEGASUS_CONSECUTIVE_MONTHS consecutive months before
+ * earning again. The current (in-progress) month never qualifies; months with
+ * no data count as zero and break the streak.
  */
 export function computePegasusBonusMonths(
   // string dates from JSON payloads, Date objects straight from Prisma
@@ -96,7 +97,7 @@ export function computePegasusBonusMonths(
   ) {
     streak = (totals.get(m.getTime()) ?? 0) >= PEGASUS_THRESHOLD ? streak + 1 : 0;
     if (
-      streak > PEGASUS_CONSECUTIVE_MONTHS &&
+      streak >= PEGASUS_CONSECUTIVE_MONTHS &&
       m.getTime() >= PEGASUS_PROGRAM_START.getTime()
     ) {
       bonusMonths.push(m);

@@ -28,49 +28,69 @@ describe("computePegasusBonusMonths", () => {
     expect(bonusMonths([])).toEqual([]);
   });
 
-  it("pays from the 4th consecutive qualifying month onward, not the 3rd", () => {
+  it("pays at the 3rd consecutive qualifying month and every month after", () => {
     const entries = [
       month(2026, 7, 30), // Aug — streak 1
       month(2026, 8, 30), // Sep — streak 2
-      month(2026, 9, 30), // Oct — streak 3 → Pegasus reached, NO bonus
+      month(2026, 9, 30), // Oct — streak 3 → Pegasus reached, BONUS
       month(2026, 10, 30), // Nov — streak 4 → bonus
       month(2026, 11, 30), // Dec — streak 5 → bonus
     ];
     // now = Jan 15 2027 so Aug–Dec 2026 are all completed months.
     expect(bonusMonths(entries, new Date(Date.UTC(2027, 0, 15)))).toEqual([
+      utcMonth(2026, 9).toISOString(),
       utcMonth(2026, 10).toISOString(),
       utcMonth(2026, 11).toISOString(),
     ]);
   });
 
-  it("does not pay the first three months of a streak (reaching Pegasus earns nothing)", () => {
+  it("pays nothing for the first two months of a streak", () => {
     const entries = [
       month(2026, 7, 30), // Aug — streak 1
       month(2026, 8, 30), // Sep — streak 2
-      month(2026, 9, 30), // Oct — streak 3 (Pegasus reached)
+      month(2026, 9, 5), // Oct — misses the bar, so no month ever reaches streak 3
     ];
     expect(bonusMonths(entries)).toEqual([]);
   });
 
   it("a below-threshold month breaks the streak and restarts the count", () => {
     const entries = [
-      month(2026, 2, 30), // Mar
-      month(2026, 3, 30), // Apr
-      month(2026, 4, 30), // May
-      month(2026, 5, 10), // Jun — breaks
+      month(2026, 2, 30), // Mar — streak 1 (pre-program)
+      month(2026, 3, 30), // Apr — streak 2 (pre-program)
+      month(2026, 4, 30), // May — streak 3 (pre-program, unpaid)
+      month(2026, 5, 10), // Jun — below threshold, breaks the streak
       month(2026, 6, 30), // Jul — streak 1
       month(2026, 7, 30), // Aug — streak 2
-      month(2026, 8, 30), // Sep — streak 3 (Pegasus reached, no bonus)
+      month(2026, 8, 30), // Sep — streak 3 → bonus (re-earned)
       month(2026, 9, 30), // Oct — streak 4 → bonus
     ];
-    expect(bonusMonths(entries)).toEqual([utcMonth(2026, 9).toISOString()]);
+    expect(bonusMonths(entries)).toEqual([
+      utcMonth(2026, 8).toISOString(),
+      utcMonth(2026, 9).toISOString(),
+    ]);
+  });
+
+  it("skipping a month forfeits the bonus until 3 consecutive months are rebuilt", () => {
+    const entries = [
+      month(2026, 7, 30), // Aug — streak 1
+      month(2026, 8, 30), // Sep — streak 2
+      month(2026, 9, 30), // Oct — streak 3 → bonus
+      month(2026, 10, 5), // Nov — misses the bar, streak resets to 0
+      month(2026, 11, 30), // Dec — streak 1, no bonus
+      month(2027, 0, 30), // Jan — streak 2, no bonus
+      month(2027, 1, 30), // Feb — streak 3 → bonus again
+    ];
+    expect(bonusMonths(entries, new Date(Date.UTC(2027, 2, 15)))).toEqual([
+      utcMonth(2026, 9).toISOString(),
+      utcMonth(2027, 1).toISOString(),
+    ]);
   });
 
   it("a month with no data at all breaks the streak", () => {
     const entries = [
-      month(2026, 6, 30), // Jul
-      month(2026, 7, 30), // Aug
-      // Sep missing entirely
+      month(2026, 6, 30), // Jul — streak 1
+      month(2026, 7, 30), // Aug — streak 2
+      // Sep missing entirely → streak resets
       month(2026, 9, 30), // Oct — streak restarts at 1
       month(2026, 10, 30), // Nov — streak 2
     ];
@@ -81,8 +101,22 @@ describe("computePegasusBonusMonths", () => {
     const entries = [
       month(2026, 4, 30), // May — pre-program, streak 1
       month(2026, 5, 30), // Jun — pre-program, streak 2
-      month(2026, 6, 30), // Jul — pre-program, streak 3 (Pegasus reached)
+      month(2026, 6, 30), // Jul — pre-program, streak 3 (would pay, but pre-program)
       month(2026, 7, 30), // Aug — streak 4 → first payable month
+    ];
+    expect(bonusMonths(entries, new Date(Date.UTC(2026, 8, 10)))).toEqual([
+      utcMonth(2026, 7).toISOString(),
+    ]);
+  });
+
+  it("pays the program-start month when it is itself the 3rd consecutive month", () => {
+    // The first payout the live program can produce: the streak is built
+    // during pre-program months, and Aug 2026 — PEGASUS_PROGRAM_START — is
+    // the month that reaches streak 3. The >= gate must pay it.
+    const entries = [
+      month(2026, 5, 30), // Jun — pre-program, streak 1
+      month(2026, 6, 30), // Jul — pre-program, streak 2
+      month(2026, 7, 30), // Aug — streak 3 AND the program-start month
     ];
     expect(bonusMonths(entries, new Date(Date.UTC(2026, 8, 10)))).toEqual([
       utcMonth(2026, 7).toISOString(),
@@ -102,9 +136,9 @@ describe("computePegasusBonusMonths", () => {
 
   it("ignores the current in-progress month", () => {
     const entries = [
-      month(2026, 7, 30), // Aug
-      month(2026, 8, 30), // Sep
-      month(2026, 9, 30), // Oct — but "now" is mid-October
+      month(2026, 7, 30), // Aug — streak 1
+      month(2026, 8, 30), // Sep — streak 2
+      month(2026, 9, 30), // Oct — would be streak 3, but "now" is mid-October
     ];
     expect(bonusMonths(entries, new Date(Date.UTC(2026, 9, 20)))).toEqual([]);
   });
@@ -115,10 +149,13 @@ describe("computePegasusBonusMonths", () => {
     const entries = [
       ...daily(2026, 7, [1, 10, 20]), // Aug: 27 ≥ 25 — streak 1
       ...daily(2026, 8, [5, 15, 25]), // Sep: 27 — streak 2
-      ...daily(2026, 9, [2, 12, 22]), // Oct: 27 — streak 3 (Pegasus reached)
+      ...daily(2026, 9, [2, 12, 22]), // Oct: 27 — streak 3 → bonus
       ...daily(2026, 10, [3, 13, 23]), // Nov: 27 — streak 4 → bonus
     ];
     expect(PEGASUS_THRESHOLD).toBe(25);
-    expect(bonusMonths(entries)).toEqual([utcMonth(2026, 10).toISOString()]);
+    expect(bonusMonths(entries)).toEqual([
+      utcMonth(2026, 9).toISOString(),
+      utcMonth(2026, 10).toISOString(),
+    ]);
   });
 });

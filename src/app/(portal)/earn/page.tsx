@@ -36,12 +36,81 @@ import { formatCurrency } from "@/lib/utils";
 import type { Invoice, LoyaltyLedgerEntry, OilChangeCount } from "@/types/database";
 import {
   PEGASUS_THRESHOLD,
+  PEGASUS_CONSECUTIVE_MONTHS,
+  PEGASUS_MONTHLY_BONUS,
   aggregateOilChangesByMonth,
   computePegasusStatus,
 } from "@/lib/pegasus";
-import { Plus, Award, FileText, BookOpen, Upload, GraduationCap, Eye } from "lucide-react";
+import { POINTS_PER_OIL_CHANGE, POINTS_PER_TRAINING } from "@/lib/constants";
+import { STOCK_UP_UNIT } from "@/lib/stock-up";
+import { Plus, Award, FileText, BookOpen, Upload, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+
+// Reference rules for the earning legend — how the program works, not a shop's
+// balances. Rendered as a key so they don't read as achieved totals. Values come
+// from the engine constants so the legend cannot drift from the rules it
+// describes.
+const ordinal = (n: number) => {
+  const suffix =
+    n % 100 >= 11 && n % 100 <= 13
+      ? "th"
+      : ["th", "st", "nd", "rd"][n % 10] ?? "th";
+  return `${n}${suffix}`;
+};
+
+const EARNING_LEGEND = [
+  {
+    heading: "Premium Growth Points",
+    rows: [
+      {
+        amount: `${PEGASUS_THRESHOLD}+`,
+        label: "oil changes in a month puts you in Pegasus Mode",
+        color: "text-exxon-red",
+      },
+      {
+        amount: `${PEGASUS_MONTHLY_BONUS} pts`,
+        label: `on your ${ordinal(PEGASUS_CONSECUTIVE_MONTHS)} consecutive month in Pegasus Mode`,
+        color: "text-exxon-red",
+      },
+      {
+        amount: `${PEGASUS_MONTHLY_BONUS} pts`,
+        label: "every consecutive month after that",
+        color: "text-exxon-red",
+      },
+      {
+        amount: `${POINTS_PER_OIL_CHANGE} pt`,
+        label: "per Mobil 1 oil change",
+        color: "text-exxon-blue",
+      },
+      {
+        amount: `${POINTS_PER_TRAINING} pts`,
+        label: "per training completed",
+        color: "text-exxon-charcoal",
+      },
+    ],
+  },
+  {
+    heading: "Stock Up Promotions",
+    rows: [
+      {
+        amount: `$${STOCK_UP_UNIT}`,
+        label: "minimum invoice amount to qualify",
+        color: "text-exxon-charcoal",
+      },
+      {
+        amount: "1",
+        label: `promotion per approved invoice of $${STOCK_UP_UNIT} or more`,
+        color: "text-exxon-red",
+      },
+      {
+        amount: "1",
+        label: `free roll of oil change stickers per $${STOCK_UP_UNIT} on the invoice`,
+        color: "text-exxon-blue",
+      },
+    ],
+  },
+] as const;
 
 export default function EarnAndTrackPage() {
   const { activeShop } = useShop();
@@ -250,7 +319,7 @@ export default function EarnAndTrackPage() {
       </Card>
 
       {/* CTA Buttons */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2">
         <Button className="bg-exxon-red text-white hover:bg-exxon-red-dark h-auto py-2.5 px-3" onClick={() => setDialogOpen(true)}>
           <Upload className="h-4 w-4 mr-2" />
           Upload Invoice
@@ -261,40 +330,44 @@ export default function EarnAndTrackPage() {
             Complete Training
           </Link>
         </Button>
-        <Button variant="outline" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 h-auto py-2.5 px-3" asChild>
-          <Link href="/dashboard">
-            <Eye className="h-4 w-4 mr-2" />
-            View Tier Status
-          </Link>
-        </Button>
       </div>
 
-      {/* How to earn info — compact tiles with Pegasus Status tracker */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground mb-0.5">Pegasus Status</p>
-            <p className="text-xl font-bold text-exxon-red">10 pts</p>
-            <p className="text-xs text-muted-foreground">every month in Pegasus Mode</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground mb-0.5">Performance Points</p>
-            <p className="text-xl font-bold text-exxon-blue">1 pt</p>
-            <p className="text-xs text-muted-foreground">per Mobil 1 oil change</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground mb-0.5">Training</p>
-            <p className="text-xl font-bold text-exxon-charcoal">10 pts</p>
-            <p className="text-xs text-muted-foreground">per training completed</p>
+      {/* Earning-rate legend + live Pegasus Status tracker */}
+      <div className="grid gap-3 md:grid-cols-2">
+        {/* Reference rules, not balances — styled as a key so they don't read as totals */}
+        <Card className="bg-muted/30">
+          <CardContent className="py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+              How the program works
+            </p>
+            <div className="space-y-3">
+              {EARNING_LEGEND.map((group) => (
+                <div key={group.heading}>
+                  <p className="text-xs font-semibold text-exxon-charcoal mb-1">
+                    {group.heading}
+                  </p>
+                  <dl className="space-y-1">
+                    {group.rows.map((row) => (
+                      <div key={row.label} className="flex items-baseline gap-2.5">
+                        <dt
+                          className={`text-sm font-semibold shrink-0 w-14 text-right ${row.color}`}
+                        >
+                          {row.amount}
+                        </dt>
+                        <dd className="text-xs text-muted-foreground leading-snug">
+                          {row.label}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
         <Card className="border-yellow-200">
-          <CardContent className="py-3">
-            <div className="flex items-stretch gap-2">
+          <CardContent className="py-3 h-full flex items-center">
+            <div className="flex items-stretch gap-2 w-full">
               {/* Bar chart */}
               <div className="flex-1 flex items-end justify-around gap-1 h-28">
                 {pegasusMonths.map((m) => {
