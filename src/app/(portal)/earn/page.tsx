@@ -33,19 +33,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadInvoice } from "@/lib/supabase/storage";
 import { formatCurrency } from "@/lib/utils";
-import type { Invoice, LoyaltyLedgerEntry, OilChangeCount } from "@/types/database";
+import type { Invoice, LoyaltyLedgerEntry } from "@/types/database";
 import {
   PEGASUS_THRESHOLD,
   PEGASUS_CONSECUTIVE_MONTHS,
   PEGASUS_MONTHLY_BONUS,
-  aggregateOilChangesByMonth,
-  computePegasusStatus,
 } from "@/lib/pegasus";
 import { POINTS_PER_OIL_CHANGE, POINTS_PER_TRAINING } from "@/lib/constants";
 import { STOCK_UP_UNIT } from "@/lib/stock-up";
 import { Plus, Award, FileText, BookOpen, Upload, GraduationCap } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 
 // Reference rules for the earning legend — how the program works, not a shop's
 // balances. Rendered as a key so they don't read as achieved totals. Values come
@@ -118,7 +115,6 @@ export default function EarnAndTrackPage() {
 
   const [invoices, setInvoices] = useState<(Invoice & { users: { name: string } })[]>([]);
   const [ledger, setLedger] = useState<LoyaltyLedgerEntry[]>([]);
-  const [oilChanges, setOilChanges] = useState<OilChangeCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -128,17 +124,16 @@ export default function EarnAndTrackPage() {
 
   const fetchData = useCallback(async () => {
     if (!activeShop) return;
-    const [invoicesRes, ledgerRes, oilChangesRes] = await Promise.all([
+    // The oil-change series is no longer fetched here: it fed only the Pegasus
+    // Status tracker, which this page no longer renders.
+    const [invoicesRes, ledgerRes] = await Promise.all([
       fetch(`/api/invoices?shop_id=${activeShop.id}`),
       fetch(`/api/points?shop_id=${activeShop.id}`),
-      fetch(`/api/oil-changes?shop_id=${activeShop.id}`),
     ]);
     const invoicesData = await invoicesRes.json();
     const ledgerData = await ledgerRes.json();
-    const oilChangesData = await oilChangesRes.json();
     setInvoices(invoicesData.data || []);
     setLedger(ledgerData.data || []);
-    setOilChanges(oilChangesData.data || []);
     setIsLoading(false);
   }, [activeShop]);
 
@@ -162,16 +157,6 @@ export default function EarnAndTrackPage() {
     .reduce((sum: number, e: LoyaltyLedgerEntry) => sum + e.points_delta, 0);
   const pointsDisplay = pointsView === "current" ? currentPoints : pointsView === "monthly" ? monthlyEarned : cumulativeEarned;
   const pointsLabel = pointsView === "current" ? "current balance" : pointsView === "monthly" ? "earned this month" : "total earned all time";
-
-  // Pegasus status: 3 consecutive months of 25+ oil changes
-  const pegasusBuckets = aggregateOilChangesByMonth(oilChanges, 3, now);
-  const pegasusMonths = pegasusBuckets.map((b) => ({
-    label: b.isCurrent ? "Current Month" : b.label,
-    count: b.count,
-  }));
-  const { inPegasus, monthsToGo } = computePegasusStatus(pegasusBuckets);
-  const pegasusThreshold = PEGASUS_THRESHOLD;
-  const pegasusMaxCount = Math.max(...pegasusMonths.map((m) => m.count), pegasusThreshold);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -287,30 +272,67 @@ export default function EarnAndTrackPage() {
         </Dialog>
       </div>
 
-      {/* Points balance card — compact with toggle */}
+      {/* Points balance + earning legend. The legend rides in the balance card's
+          top-right rather than in its own row below: it is reference material a
+          shop glances at, so it costs no vertical space here and leaves the
+          invoice history higher up the page. */}
       <Card className="border-exxon-red/20">
         <CardContent className="py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-exxon-red/10">
-              <Award className="h-6 w-6 text-exxon-red" />
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-exxon-red/10">
+                <Award className="h-6 w-6 text-exxon-red" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{pointsLabel}</p>
+                <p className="text-3xl font-bold text-exxon-charcoal">{pointsDisplay}</p>
+                <p className="text-xs text-muted-foreground">premium growth points</p>
+                <div className="flex gap-1 mt-2">
+                  {(["current", "monthly", "cumulative"] as const).map((view) => (
+                    <button
+                      key={view}
+                      onClick={() => setPointsView(view)}
+                      className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                        pointsView === view
+                          ? "bg-exxon-red text-white"
+                          : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
+                      }`}
+                    >
+                      {view === "current" ? "Current" : view === "monthly" ? "Monthly" : "All Time"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">{pointsLabel}</p>
-              <p className="text-3xl font-bold text-exxon-charcoal">{pointsDisplay}</p>
-              <p className="text-xs text-muted-foreground">premium growth points</p>
-              <div className="flex gap-1 mt-2">
-                {(["current", "monthly", "cumulative"] as const).map((view) => (
-                  <button
-                    key={view}
-                    onClick={() => setPointsView(view)}
-                    className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
-                      pointsView === view
-                        ? "bg-exxon-red text-white"
-                        : "bg-gray-100 text-muted-foreground hover:bg-gray-200"
-                    }`}
-                  >
-                    {view === "current" ? "Current" : view === "monthly" ? "Monthly" : "All Time"}
-                  </button>
+
+            {/* Reference rules, not balances — styled as a key so they don't read
+                as totals. Below lg it stacks under the balance instead of
+                squeezing two columns into a phone width. */}
+            <div className="border-t pt-4 lg:max-w-[62%] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                How the program works
+              </p>
+              <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                {EARNING_LEGEND.map((group) => (
+                  <div key={group.heading}>
+                    <p className="text-xs font-semibold text-exxon-charcoal mb-1">
+                      {group.heading}
+                    </p>
+                    <dl className="space-y-1">
+                      {group.rows.map((row) => (
+                        <div key={row.label} className="flex items-baseline gap-2.5">
+                          <dt
+                            className={`text-sm font-semibold shrink-0 w-14 text-right ${row.color}`}
+                          >
+                            {row.amount}
+                          </dt>
+                          <dd className="text-xs text-muted-foreground leading-snug">
+                            {row.label}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
                 ))}
               </div>
             </div>
@@ -330,89 +352,6 @@ export default function EarnAndTrackPage() {
             Complete Training
           </Link>
         </Button>
-      </div>
-
-      {/* Earning-rate legend + live Pegasus Status tracker */}
-      <div className="grid gap-3 md:grid-cols-2">
-        {/* Reference rules, not balances — styled as a key so they don't read as totals */}
-        <Card className="bg-muted/30">
-          <CardContent className="py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
-              How the program works
-            </p>
-            <div className="space-y-3">
-              {EARNING_LEGEND.map((group) => (
-                <div key={group.heading}>
-                  <p className="text-xs font-semibold text-exxon-charcoal mb-1">
-                    {group.heading}
-                  </p>
-                  <dl className="space-y-1">
-                    {group.rows.map((row) => (
-                      <div key={row.label} className="flex items-baseline gap-2.5">
-                        <dt
-                          className={`text-sm font-semibold shrink-0 w-14 text-right ${row.color}`}
-                        >
-                          {row.amount}
-                        </dt>
-                        <dd className="text-xs text-muted-foreground leading-snug">
-                          {row.label}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-yellow-200">
-          <CardContent className="py-3 h-full flex items-center">
-            <div className="flex items-stretch gap-2 w-full">
-              {/* Bar chart */}
-              <div className="flex-1 flex items-end justify-around gap-1 h-28">
-                {pegasusMonths.map((m) => {
-                  const isPegasus = m.count >= pegasusThreshold;
-                  const heightPct = (m.count / pegasusMaxCount) * 100;
-                  return (
-                    <div key={m.label} className="flex flex-col items-center h-full">
-                      <span className="text-sm font-semibold text-exxon-charcoal mb-0.5">
-                        {m.count}
-                      </span>
-                      <div className="flex-1 flex items-end">
-                        <div
-                          className="w-5 bg-exxon-blue rounded-t-sm"
-                          style={{ height: `${heightPct}%` }}
-                        />
-                      </div>
-                      <div className="h-9 mt-1 flex items-center justify-center">
-                        {isPegasus && (
-                          <Image
-                            src="/Mobil_Pegasus_red_RGB-TM.png"
-                            alt="Pegasus Mode"
-                            width={32}
-                            height={32}
-                          />
-                        )}
-                      </div>
-                      <span className="text-sm font-medium text-muted-foreground text-center leading-tight">
-                        {m.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Status indicator */}
-              <div className="flex flex-col items-center justify-center border-l pl-2 min-w-[72px]">
-                <p className="text-sm font-bold text-exxon-charcoal text-center leading-tight">
-                  {inPegasus
-                    ? "Achieved!"
-                    : `${monthsToGo} month${monthsToGo !== 1 ? "s" : ""} away`}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 text-center">Pegasus Status</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Tabs: Invoices + Points Ledger */}
