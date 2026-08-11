@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { shopUpdateSchema } from "@/lib/validators/shop";
 import { createAdminClient } from "@/lib/supabase/server";
 import { STORAGE_BUCKETS } from "@/lib/constants";
+import { canAccessShop } from "@/lib/shop-scope";
 
 export async function GET(
   req: NextRequest,
@@ -18,7 +19,9 @@ export async function GET(
 
   const data = await prisma.shop.findUnique({ where: { id } });
 
-  if (!data) {
+  // Another shop's record — its address, points balance and program status —
+  // is 404, not 403, so the response never confirms the id exists.
+  if (!data || !canAccessShop(session, data.id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
