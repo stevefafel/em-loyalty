@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { authMode } from "@/lib/auth/config";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +10,20 @@ export const metadata: Metadata = {
   title: "Premium Growth Portal",
 };
 
+/** Shared by both branches of the log-in call to action. */
+const LOGIN_CTA_CLASS =
+  "w-full rounded-md bg-exxon-red px-6 py-3 text-center font-semibold text-white hover:bg-exxon-red-dark sm:w-auto";
+
 export default async function Home() {
   const session = await getSession();
   if (session) {
     redirect("/dashboard");
   }
+
+  // In keycloak mode /login is a dead stop: it renders one "Sign In" link to
+  // /api/auth/login and nothing else, so this sends the user straight into the
+  // OIDC flow. Mock mode still goes to /login — that page holds the user picker.
+  const keycloak = authMode === "keycloak";
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white px-4">
@@ -46,12 +56,18 @@ export default async function Home() {
         </div>
 
         <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link
-            href="/login"
-            className="w-full rounded-md bg-exxon-red px-6 py-3 text-center font-semibold text-white hover:bg-exxon-red-dark sm:w-auto"
-          >
-            Log In
-          </Link>
+          {keycloak ? (
+            // A plain anchor, not Link: the route answers with a redirect to
+            // Keycloak's authorize endpoint, and client-side navigation cannot
+            // follow a cross-origin redirect.
+            <a href="/api/auth/login" className={LOGIN_CTA_CLASS}>
+              Log In
+            </a>
+          ) : (
+            <Link href="/login" className={LOGIN_CTA_CLASS}>
+              Log In
+            </Link>
+          )}
           <Link
             href="/register"
             className="w-full rounded-md border border-exxon-charcoal/25 px-6 py-3 text-center font-semibold text-exxon-charcoal hover:bg-exxon-charcoal/5 sm:w-auto"
