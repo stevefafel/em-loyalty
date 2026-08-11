@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { authMode } from "@/lib/auth/config";
+import { loginErrorMessage } from "@/lib/auth/login-errors";
 import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +10,18 @@ export const metadata: Metadata = {
   title: "Sign In",
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
   const keycloak = authMode === "keycloak";
+
+  // The OIDC routes bounce failures back here with ?error=. Without this the
+  // user just sees the login screen again and cannot tell a failed sign-in from
+  // never having started one.
+  const { error } = await searchParams;
+  const errorMessage = loginErrorMessage(error);
 
   // Only query users/shops for the mock picker; keycloak mode needs no DB.
   let users: {
@@ -79,6 +90,15 @@ export default async function LoginPage() {
               : "Select a user to sign in (POC mock auth)"}
           </p>
         </div>
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="rounded-md border border-exxon-red/30 bg-exxon-red/5 px-4 py-3 text-sm text-exxon-charcoal"
+          >
+            {errorMessage}
+          </div>
+        )}
 
         {keycloak ? (
           <a
