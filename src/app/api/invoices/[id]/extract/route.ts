@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { extractInvoiceData } from "@/lib/ai/extract-invoice";
 import { invoiceExtractionResponseSchema } from "@/lib/validators/invoice-extraction";
 import { STORAGE_BUCKETS } from "@/lib/constants";
+import { canAccessShop } from "@/lib/shop-scope";
 
 export const maxDuration = 30;
 
@@ -19,8 +20,12 @@ export async function POST(
 
   const { id } = await params;
 
+  // Scope before any mutation: everything below this point resets the
+  // extraction to "processing", clears its parsed values, deletes its line
+  // items and spends a paid AI call, so a cross-shop caller must be turned away
+  // here rather than after the damage. 404, not 403 — the id stays unconfirmed.
   const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (!invoice) {
+  if (!invoice || !canAccessShop(session, invoice.shop_id)) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 

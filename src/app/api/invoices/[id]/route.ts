@@ -5,6 +5,7 @@ import { userFullName } from "@/lib/utils";
 import { createAdminClient } from "@/lib/supabase/server";
 import { STORAGE_BUCKETS } from "@/lib/constants";
 import { invoiceOverrideSchema } from "@/lib/validators/invoice";
+import { canAccessShop } from "@/lib/shop-scope";
 
 export async function GET(
   req: NextRequest,
@@ -30,7 +31,9 @@ export async function GET(
     },
   });
 
-  if (!data) {
+  // Another shop's invoice is 404, never 403: the response must not confirm
+  // that an id exists. Same rule the support routes use.
+  if (!data || !canAccessShop(session, data.shop_id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

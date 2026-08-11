@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { POINTS_PER_OIL_CHANGE } from "@/lib/constants";
 import { reconcilePegasusAwards } from "@/lib/pegasus-awards";
+import { shopFilterFor } from "@/lib/shop-scope";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -10,13 +11,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const shopId = req.nextUrl.searchParams.get("shop_id");
-
-  const where: { shop_id?: string } = {};
-  if (session.role === "user" && session.shopId) {
-    where.shop_id = session.shopId;
-  } else if (shopId) {
-    where.shop_id = shopId;
+  // Same fail-open guard the invoices list carried: testing session.shopId for
+  // truthiness let a user with no shop fall through to the client-supplied
+  // shop_id — and the reconcile below is a write, so that fallthrough handed an
+  // attacker a write trigger on any shop they named.
+  const where = shopFilterFor(session, req.nextUrl.searchParams.get("shop_id"));
+  if (!where) {
+    return NextResponse.json({ data: [] });
   }
 
   // Viewing a single shop's data is also a reconcile point, so a bonus that
