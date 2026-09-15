@@ -99,3 +99,13 @@ describe("session seal/decode", () => {
     ).rejects.toThrow(/cookie budget/);
   });
 });
+
+describe("sessionCookieOptions", () => {
+  it("is a browser-session cookie: no maxAge or expires, so closing the browser drops it", async () => {
+    const { sessionCookieOptions } = await load();
+    const options = sessionCookieOptions();
+    expect(options).not.toHaveProperty("maxAge");
+    expect(options).not.toHaveProperty("expires");
+    expect(options).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/" });
+  });
+});

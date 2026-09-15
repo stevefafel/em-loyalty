@@ -44,13 +44,17 @@ export interface SessionInput {
   expiresAt?: number;
 }
 
-export function sessionCookieOptions(maxAgeSeconds = SESSION_TTL_SECONDS) {
+/**
+ * A browser-session cookie: no maxAge/expires, so it is dropped when the
+ * browser closes instead of persisting to disk (VA finding 79190). The 8h
+ * ceiling is still enforced by the sealed `expiresAt`, independent of the cookie.
+ */
+export function sessionCookieOptions() {
   return {
     httpOnly: true,
     secure: cookieSecure(),
     sameSite: "lax" as const,
     path: "/",
-    maxAge: maxAgeSeconds,
   };
 }
 
