@@ -78,9 +78,23 @@ export class InvoiceExtractionError extends Error {
   }
 }
 
+/**
+ * Time limits, so a hung provider call can't outlive the extract route's 60 s
+ * `maxDuration` (the SDK default is 10 minutes per attempt plus 2 retries).
+ * Each attempt gets REQUEST_TIMEOUT_MS; EXTRACTION_DEADLINE_MS caps the whole
+ * call, retry back-off included, and aborts an in-flight attempt.
+ */
+const REQUEST_TIMEOUT_MS = 40_000;
+const MAX_RETRIES = 1;
+const EXTRACTION_DEADLINE_MS = 45_000;
+
 let client: OpenAI | null = null;
 function getClient(): OpenAI {
-  client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  client ??= new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: REQUEST_TIMEOUT_MS,
+    maxRetries: MAX_RETRIES,
+  });
   return client;
 }
 
@@ -226,7 +240,7 @@ export async function extractInvoiceData(
           ],
         },
       ],
-    });
+    }, { signal: AbortSignal.timeout(EXTRACTION_DEADLINE_MS) });
   } catch (err) {
     throw toExtractionError(err);
   }

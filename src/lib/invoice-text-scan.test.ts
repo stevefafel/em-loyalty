@@ -623,6 +623,13 @@ describe("scanPdf", () => {
     expect(bytes).toEqual(before);
   });
 
+  it("scans a Node Buffer (the storage download's type) the same as a Uint8Array", async () => {
+    const bytes = Buffer.from(buildPdf({ pages: [{ texts: invoiceTexts() }] }));
+    const result = await scanPdf(bytes);
+    expect(result).toEqual({ status: "scanned", hits: [], labelledTotalsCents: [137950] });
+    expect(bytes.byteLength).toBeGreaterThan(0);
+  });
+
   it("flags the tester's payload in the text layer", async () => {
     const bytes = buildPdf({ pages: [{ texts: invoiceTexts([{ str: TESTER_PAYLOAD, y: 560, size: 8 }]) }] });
     const result = await scanPdf(bytes);

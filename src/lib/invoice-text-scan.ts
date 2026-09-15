@@ -535,8 +535,10 @@ export interface ScanOptions {
 /** Hardened pdf.js options: no eval, no network or filesystem fetches, strict errors. */
 function documentInit(bytes: Uint8Array): DocumentInit {
   const init: DocumentInit & { isEvalSupported?: boolean } = {
-    // pdf.js transfers (detaches) the buffer it is given, so pass a copy.
-    data: bytes.slice(),
+    // pdf.js transfers (detaches) the buffer it is given, so pass a copy. It
+    // also rejects Node Buffers, and Buffer.slice() is a view rather than a
+    // copy, so always build a plain Uint8Array.
+    data: new Uint8Array(bytes),
     // pdf.js 5+ has no eval code path (CVE-2024-4367); kept in case an older
     // build is ever swapped in.
     isEvalSupported: false,
