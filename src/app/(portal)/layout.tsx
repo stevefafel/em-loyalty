@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { getSessionResult } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { AuthProvider } from "@/context/auth-context";
 import { ShopProvider } from "@/context/shop-context";
@@ -18,8 +18,10 @@ export default async function PortalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // A refused session carries why (idle, replaced by another admin sign-in,
+  // or ended), so /login can explain the sign-out instead of just re-prompting.
+  const { session, ended } = await getSessionResult();
+  if (!session) redirect(ended ? `/login?error=${ended}` : "/login");
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },

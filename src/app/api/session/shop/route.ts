@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
   }
 
   const sealed = await sealSession({
+    // Same sign-in, same server-side record: switching shops is not a new session.
+    sid: session.sid,
     userId: session.userId,
     role: session.role,
     shopId: shopId as string,

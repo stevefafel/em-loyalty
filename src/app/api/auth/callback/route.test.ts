@@ -8,6 +8,7 @@ const updateUser = vi.fn();
 const findShops = vi.fn();
 const grant = vi.fn();
 const buildEndSessionUrl = vi.fn();
+const createSession = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -37,6 +38,10 @@ vi.mock("@/lib/auth/oidc", () => ({
   },
 }));
 
+vi.mock("@/lib/session-store", () => ({
+  createSession: (...a: unknown[]) => createSession(...a),
+}));
+
 // Valid per-state transaction cookie for state "s".
 function validTxn() {
   cookieJar = { oidc_txn_s: JSON.stringify({ verifier: "v", nonce: "n" }) };
@@ -58,6 +63,7 @@ beforeEach(() => {
   findShops.mockReset().mockResolvedValue([]);
   grant.mockReset();
   buildEndSessionUrl.mockReset();
+  createSession.mockReset().mockResolvedValue({ id: "sid-1", expiresAt: 9e9 });
   validTxn();
 });
 
@@ -119,6 +125,38 @@ describe("callback route", () => {
     expect(res.headers.get("set-cookie") ?? "").toContain("session=");
     // No sub claim → email path only, and nothing to stamp.
     expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("records a server-side session holding the Keycloak refresh token", async () => {
+    grant.mockResolvedValue({
+      claims: () => ({ email: "steve@steer.io", email_verified: true }),
+      id_token: "ID-TOK",
+      refresh_token: "RT-1",
+    });
+    findUser.mockResolvedValue({ id: "u1", role: "admin", keycloak_id: null });
+    const { GET } = await loadRoute();
+    await GET(req());
+    expect(createSession).toHaveBeenCalledWith({ userId: "u1", role: "admin", refreshToken: "RT-1" });
+  });
+
+  it("requires the Steer sign-in to be under 30 minutes old (max_age)", async () => {
+    grant.mockRejectedValue(new Error("unexpected"));
+    const { GET } = await loadRoute();
+    await GET(req());
+    expect(grant.mock.calls[0][2]).toMatchObject({ maxAge: 1800 });
+  });
+
+  it("redirects /login?error=db when the session record cannot be written", async () => {
+    grant.mockResolvedValue({
+      claims: () => ({ email: "steve@steer.io", email_verified: true }),
+      id_token: "ID-TOK",
+    });
+    findUser.mockResolvedValue({ id: "u1", role: "admin", keycloak_id: null });
+    createSession.mockRejectedValue(new Error("db down"));
+    const { GET } = await loadRoute();
+    const res = await GET(req());
+    expect(res.headers.get("location")).toContain("/login?error=db");
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(/(^|, )session=[^;]/);
   });
 
   it("matches a linked user by sub even when the token email differs from the row email", async () => {

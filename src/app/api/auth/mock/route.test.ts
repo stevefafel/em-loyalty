@@ -9,6 +9,11 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { user: { findUnique: (...args: unknown[]) => findUnique(...args) } },
 }));
 
+const createSession = vi.fn();
+vi.mock("@/lib/session-store", () => ({
+  createSession: (...args: unknown[]) => createSession(...args),
+}));
+
 function setMode(mode: "mock" | "keycloak") {
   process.env.SESSION_SECRET = SECRET;
   process.env.AUTH_MODE = "mock";
@@ -29,7 +34,10 @@ function postReq(body: unknown) {
 }
 
 const originalEnv = { ...process.env };
-beforeEach(() => findUnique.mockReset());
+beforeEach(() => {
+  findUnique.mockReset();
+  createSession.mockReset().mockResolvedValue({ id: "sid-1", expiresAt: 9e9 });
+});
 afterEach(() => {
   process.env = { ...originalEnv };
 });
