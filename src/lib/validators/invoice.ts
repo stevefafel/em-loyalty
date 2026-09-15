@@ -53,3 +53,14 @@ export const invoiceOverrideSchema = z.object({
 });
 
 export type InvoiceOverrideInput = z.infer<typeof invoiceOverrideSchema>;
+
+// Admin approval (KTD6). `runId` is the extraction run the admin reviewed; the
+// server approves only if that run is still current. `confirmReviewed` is the
+// admin's confirmation that they checked the original document, required for a
+// flagged, failed or unchecked run.
+export const invoiceApproveSchema = z.object({
+  runId: z.uuid(),
+  confirmReviewed: z.boolean().optional(),
+});
+
+export type InvoiceApproveInput = z.infer<typeof invoiceApproveSchema>;

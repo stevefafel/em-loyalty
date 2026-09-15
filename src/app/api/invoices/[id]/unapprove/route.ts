@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -35,11 +36,29 @@ export async function POST(
   });
   const pointsDelta = credited._sum.points_delta ?? 0;
 
+  const now = new Date();
+
   await prisma.$transaction([
+    // Void the approval and any confirmation, and start a new run, so a tab
+    // opened before the unapprove is stale and a flagged run needs a fresh
+    // confirmation (KTD9). Extraction row first: the approve route's lock order.
+    // updateMany, because an invoice approved before extraction existed has no row.
+    prisma.invoiceExtraction.updateMany({
+      where: { invoice_id: id },
+      data: {
+        approved_run_id: null,
+        confirmed_run_id: null,
+        confirmed_at: null,
+        confirmed_by: null,
+        run_id: randomUUID(),
+        updated_at: now,
+      },
+    }),
+
     // Revert invoice status to pending
     prisma.invoice.update({
       where: { id },
-      data: { status: "pending", updated_at: new Date() },
+      data: { status: "pending", updated_at: now },
     }),
 
     ...(pointsDelta !== 0
@@ -64,7 +83,7 @@ export async function POST(
         ...(pointsDelta !== 0
           ? { loyalty_points_balance: { decrement: pointsDelta } }
           : {}),
-        updated_at: new Date(),
+        updated_at: now,
         ...(invoice.is_initial ? { program_status: "pending" } : {}),
       },
     }),
