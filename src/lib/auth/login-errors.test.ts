@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LOGIN_ERROR_FALLBACK, loginErrorMessage } from "./login-errors";
 
-// Every code the OIDC routes actually redirect to /login with. Kept in sync by
-// hand with api/auth/login/route.ts and api/auth/callback/route.ts — if a route
-// grows a new code, it belongs here and in the message map.
-const EMITTED_CODES = ["unavailable", "state", "exchange", "db"] as const;
+// Every code actually redirected to /login with. Kept in sync by hand with
+// api/auth/login/route.ts, api/auth/callback/route.ts, and the portal layout's
+// ended-session reasons (SessionEndReason) — a new code belongs here and in
+// the message map.
+const EMITTED_CODES = ["unavailable", "state", "exchange", "db", "idle", "replaced", "ended"] as const;
 
 describe("loginErrorMessage", () => {
   it("returns null when no error param is present", () => {

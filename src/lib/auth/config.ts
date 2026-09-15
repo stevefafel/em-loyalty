@@ -75,3 +75,10 @@ export function sessionSecretKey(): Uint8Array {
 
 /** Fixed application session lifetime (KTD-8). */
 export const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 hours
+
+/**
+ * Oldest Steer sign-in the portal accepts without asking for credentials again
+ * (OIDC `max_age`). Without it, a portal session that ended for inactivity
+ * would be silently re-created from a still-live Keycloak SSO session.
+ */
+export const REAUTH_MAX_AGE_SECONDS = 30 * 60;

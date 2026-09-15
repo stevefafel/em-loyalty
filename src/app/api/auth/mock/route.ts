@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { mockLoginSchema } from "@/lib/validators/auth";
 import { authMode } from "@/lib/auth/config";
 import { sealSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
+import { createSession } from "@/lib/session-store";
 
 /** Mock login is local-dev only. Inert in keycloak mode (any non-local env). */
 function mockDisabledResponse() {
@@ -28,7 +29,14 @@ export async function POST(req: NextRequest) {
   }
 
   const shopId = parsed.data.shopId || null;
-  const sealed = await sealSession({ userId: user.id, role: user.role, shopId });
+  const session = await createSession({ userId: user.id, role: user.role });
+  const sealed = await sealSession({
+    sid: session.id,
+    userId: user.id,
+    role: user.role,
+    shopId,
+    expiresAt: session.expiresAt,
+  });
 
   const response = NextResponse.json({
     data: { user, session: { userId: user.id, role: user.role, shopId } },

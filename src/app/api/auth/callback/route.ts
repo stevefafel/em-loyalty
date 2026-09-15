@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sealSession, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
+import { createSession } from "@/lib/session-store";
+import { REAUTH_MAX_AGE_SECONDS } from "@/lib/auth/config";
 import {
   client,
   clearTxnCookie,
@@ -58,6 +60,8 @@ export async function GET(req: NextRequest) {
       expectedState: state,
       expectedNonce: nonce,
       idTokenExpected: true,
+      // Validates the ID token's auth_time against the max_age the login sent.
+      maxAge: REAUTH_MAX_AGE_SECONDS,
     });
   } catch {
     return redirectTo("/login?error=exchange");
@@ -132,11 +136,24 @@ export async function GET(req: NextRequest) {
     return redirectTo("/access-denied");
   }
 
+  let session;
+  try {
+    session = await createSession({
+      userId: result.userId,
+      role: result.role,
+      refreshToken: tokens.refresh_token,
+    });
+  } catch {
+    return redirectTo("/login?error=db");
+  }
+
   const sealed = await sealSession({
+    sid: session.id,
     userId: result.userId,
     role: result.role,
     shopId: result.shopId,
     idToken: tokens.id_token,
+    expiresAt: session.expiresAt,
   });
 
   const response = redirectTo("/dashboard");

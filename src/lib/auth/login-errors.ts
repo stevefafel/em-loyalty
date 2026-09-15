@@ -26,6 +26,12 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   exchange: "We couldn't complete your sign-in. Please try again.",
   // The database was unavailable partway through the callback.
   db: "Sign-in is temporarily unavailable. Please try again in a few minutes.",
+  // Ended-session reasons (SessionEndReason), sent by the portal layout when a
+  // cookie's server-side session is no longer live.
+  idle: "You were signed out after a period of inactivity. Please sign in again.",
+  replaced:
+    "You were signed out because your account signed in on another device or browser. If that wasn't you, sign in and change your password.",
+  ended: "You've been signed out. Please sign in again.",
 };
 
 /**

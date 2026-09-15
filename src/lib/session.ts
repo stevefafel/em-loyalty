@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { EncryptJWT, jwtDecrypt } from "jose";
 import type { MockSession } from "@/types/api";
 import { cookieSecure, SESSION_TTL_SECONDS, sessionSecretKey } from "@/lib/auth/config";
+import { validateSession, type SessionEndReason } from "@/lib/session-store";
 
 /**
  * Browsers silently drop cookies over ~4KB. The sealed session carries the
@@ -24,6 +25,8 @@ export const SESSION_COOKIE = "session";
 
 /** Superset of MockSession so existing consumers ({userId, role, shopId}) are untouched. */
 export interface SessionData extends MockSession {
+  /** Id of this sign-in's `sessions` row; every request is checked against it. */
+  sid: string;
   /** Keycloak ID token, kept for RP-initiated logout (id_token_hint). Absent in mock mode. */
   idToken?: string;
   /** Unix seconds. Hard session expiry (KTD-8). */
@@ -31,6 +34,7 @@ export interface SessionData extends MockSession {
 }
 
 export interface SessionInput {
+  sid: string;
   userId: string;
   role: MockSession["role"];
   shopId: string | null;
@@ -66,6 +70,7 @@ export async function sealSession(input: SessionInput): Promise<string> {
   const expiresAt =
     input.expiresAt ?? Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   const payload: SessionData = {
+    sid: input.sid,
     userId: input.userId,
     role: input.role,
     shopId: input.shopId,
@@ -91,7 +96,13 @@ export async function decodeSession(raw: string): Promise<SessionData | null> {
   try {
     const { payload } = await jwtDecrypt(raw, sessionSecretKey());
     const data = payload as unknown as SessionData;
-    if (typeof data.userId !== "string" || typeof data.expiresAt !== "number") {
+    // A cookie without `sid` predates server-side sessions and cannot be
+    // revoked, so it is not accepted.
+    if (
+      typeof data.sid !== "string" ||
+      typeof data.userId !== "string" ||
+      typeof data.expiresAt !== "number"
+    ) {
       return null;
     }
     // Enforce TTL independently of the JWE `exp` check.
@@ -102,10 +113,29 @@ export async function decodeSession(raw: string): Promise<SessionData | null> {
   }
 }
 
-/** Read the current session from the request cookies. */
-export async function getSession(): Promise<SessionData | null> {
+export type SessionResult =
+  | { session: SessionData; ended?: undefined }
+  | { session: null; ended: SessionEndReason | null };
+
+/**
+ * Read the current session and check it against its server-side record. When
+ * there is none, `ended` says why a session the browser still held was
+ * refused (null when there was no cookie at all), so the portal can tell the
+ * user they were signed out rather than silently sending them to sign in.
+ */
+export async function getSessionResult(): Promise<SessionResult> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!raw) return null;
-  return decodeSession(raw);
+  if (!raw) return { session: null, ended: null };
+
+  const data = await decodeSession(raw);
+  if (!data) return { session: null, ended: "ended" };
+
+  const check = await validateSession({ sid: data.sid, userId: data.userId, role: data.role });
+  return check.ok ? { session: data } : { session: null, ended: check.reason };
+}
+
+/** Read the current session, or null when there is no live one. */
+export async function getSession(): Promise<SessionData | null> {
+  return (await getSessionResult()).session;
 }

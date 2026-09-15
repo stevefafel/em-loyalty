@@ -108,9 +108,35 @@ model User {
   invoices        Invoice[]
   training_logs   TrainingLog[]
   collateral_logs CollateralLog[]
+  sessions        Session[]
 
   @@index([role])
   @@map("users")
+}
+
+// Server-side record of each portal sign-in. The sealed session cookie carries
+// this row's id, so revoking the row ends the session even if the cookie was
+// copied — logout, idle timeout, a newer admin sign-in, or the Steer sign-in
+// ending. Rows are pruned a week after they stop being usable.
+model Session {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String    @db.Uuid
+  /// Keycloak refresh token, encrypted with SESSION_SECRET. Refreshing it
+  /// periodically confirms the Steer sign-in is still live. Null in mock mode.
+  refresh_token  String?
+  created_at     DateTime  @default(now()) @db.Timestamptz()
+  last_seen_at   DateTime  @default(now()) @db.Timestamptz()
+  /// When the Steer sign-in was last confirmed live.
+  verified_at    DateTime  @default(now()) @db.Timestamptz()
+  expires_at     DateTime  @db.Timestamptz()
+  revoked_at     DateTime? @db.Timestamptz()
+  /// logout | idle | replaced | expired | signin-ended
+  revoked_reason String?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("sessions")
 }
 
 model UserShop {

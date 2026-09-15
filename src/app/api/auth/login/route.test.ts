@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const discovery = vi.fn();
+const buildAuthorizationUrl = vi.fn();
 
 vi.mock("@/lib/auth/config", () => ({
   keycloakRedirectUri: () => "http://localhost:3000/api/auth/callback",
+  REAUTH_MAX_AGE_SECONDS: 1800,
 }));
 
 vi.mock("@/lib/auth/oidc", () => ({
@@ -16,8 +18,10 @@ vi.mock("@/lib/auth/oidc", () => ({
     calculatePKCECodeChallenge: async () => "challenge-123",
     randomState: () => "STATE1",
     randomNonce: () => "NONCE1",
-    buildAuthorizationUrl: () =>
-      new URL("http://kc/realms/steer/protocol/openid-connect/auth?x=1"),
+    buildAuthorizationUrl: (...a: unknown[]) => {
+      buildAuthorizationUrl(...a);
+      return new URL("http://kc/realms/steer/protocol/openid-connect/auth?x=1");
+    },
   },
 }));
 
@@ -42,6 +46,13 @@ describe("login route", () => {
     // verifier + nonce are stored in the cookie value (URL-encoded JSON)
     expect(decodeURIComponent(setCookie)).toContain("verifier-123");
     expect(decodeURIComponent(setCookie)).toContain("NONCE1");
+  });
+
+  it("asks Keycloak for credentials again when the Steer sign-in is over 30 minutes old", async () => {
+    discovery.mockResolvedValue({});
+    const { GET } = await loadRoute();
+    await GET(req());
+    expect(buildAuthorizationUrl.mock.calls[0][1]).toMatchObject({ max_age: "1800" });
   });
 
   it("redirects /login?error=unavailable when discovery fails (no 500, no cookie)", async () => {

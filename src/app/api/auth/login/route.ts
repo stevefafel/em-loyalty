@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { keycloakRedirectUri } from "@/lib/auth/config";
+import { keycloakRedirectUri, REAUTH_MAX_AGE_SECONDS } from "@/lib/auth/config";
 import {
   client,
   getOidcConfig,
@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
     code_challenge_method: "S256",
     state,
     nonce,
+    // Ask for credentials again when the Steer sign-in is older than this.
+    max_age: String(REAUTH_MAX_AGE_SECONDS),
   });
 
   const response = NextResponse.redirect(authUrl);
