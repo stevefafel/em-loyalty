@@ -34,7 +34,7 @@ import { formatCurrency, formatDateUTC } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
 import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2, Trash2, Pencil, Save, RefreshCw, ShieldCheck } from "lucide-react";
 import type { InvoiceExtraction } from "@/types/database";
-import { REVIEW_FLAG_LABELS, type ApprovalDecision } from "@/lib/invoice-checks";
+import { APPROVAL_STATE_REASONS, REVIEW_FLAG_LABELS, type ApprovalDecision } from "@/lib/invoice-checks";
 
 /** How often the review modal re-reads an extraction that is still running. */
 const POLL_INTERVAL_MS = 3000;
@@ -70,7 +70,7 @@ interface StoredFlag {
 }
 
 /** Approval reasons that describe the extraction state rather than a stored warning. */
-const STATE_REASONS = new Set(["no_extraction", "processing", "failed", "unchecked"]);
+const STATE_REASONS: ReadonlySet<string> = new Set(APPROVAL_STATE_REASONS);
 
 /** Friendly copy per stored `error_message` code. Raw text is never shown (KTD11). */
 const EXTRACTION_FAILURE_MESSAGES: Record<string, string> = {

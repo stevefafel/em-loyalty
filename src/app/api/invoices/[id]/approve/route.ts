@@ -3,20 +3,8 @@ import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { SHOP_APPROVED_NOTIFICATION } from "@/lib/notifications";
 import { invoiceApproveSchema } from "@/lib/validators/invoice";
-import { approvalDecision, type ExtractionForApproval } from "@/lib/invoice-checks";
-
-/**
- * Thrown inside the approval transaction to roll it back and answer 409.
- * Rolling back matters: the first statement already set approved_run_id.
- */
-class ApprovalConflict extends Error {
-  constructor(readonly body: { error: string; code: string; reasons?: string[] }) {
-    super(body.error);
-  }
-}
-
-const isTransactionTimeout = (err: unknown) =>
-  typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2028";
+import { approvalDecision } from "@/lib/invoice-checks";
+import { TransactionConflict, isTransactionTimeout } from "@/lib/transaction-conflict";
 
 /**
  * Approves an invoice against the exact extraction run the admin reviewed
@@ -88,7 +76,7 @@ export async function POST(
         data: { approved_run_id: runId },
       });
       if (locked.count === 0) {
-        throw new ApprovalConflict({
+        throw new TransactionConflict({
           error:
             "This invoice changed, is still extracting, or was already approved. Refetch it and review again.",
           code: "stale",
@@ -100,18 +88,16 @@ export async function POST(
         where: { invoice_id: id },
         select: { status: true, checks_version: true, review_flags: true },
       });
-      const decision = approvalDecision(
-        row ? (row as unknown as ExtractionForApproval) : null
-      );
+      const decision = approvalDecision(row);
       if (!decision.approvable) {
-        throw new ApprovalConflict({
+        throw new TransactionConflict({
           error: "This invoice can't be approved yet. Refetch it and review again.",
           code: "stale",
           reasons: decision.reasons,
         });
       }
       if (decision.confirmationRequired && confirmReviewed !== true) {
-        throw new ApprovalConflict({
+        throw new TransactionConflict({
           error: "Confirm you reviewed the original document before approving this invoice.",
           code: "confirmation_required",
           reasons: decision.reasons,
@@ -138,7 +124,7 @@ export async function POST(
         data: { status: "approved", updated_at: now },
       });
       if (approved.count === 0) {
-        throw new ApprovalConflict({ error: "Invoice already approved", code: "already_approved" });
+        throw new TransactionConflict({ error: "Invoice already approved", code: "already_approved" });
       }
 
       // 5. Invoices no longer earn points — approval only drives enrollment.
@@ -154,7 +140,7 @@ export async function POST(
       }
     });
   } catch (err) {
-    if (err instanceof ApprovalConflict) {
+    if (err instanceof TransactionConflict) {
       return NextResponse.json(err.body, { status: 409 });
     }
     if (isTransactionTimeout(err)) {

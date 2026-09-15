@@ -8,10 +8,10 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { STORAGE_BUCKETS } from "@/lib/constants";
 import { invoiceOverrideSchema } from "@/lib/validators/invoice";
 import { canAccessShop } from "@/lib/shop-scope";
+import { TransactionConflict, isTransactionTimeout } from "@/lib/transaction-conflict";
 import {
   approvalDecision,
   recomputeValueFlags,
-  type ExtractionForApproval,
   type ReviewFlag,
 } from "@/lib/invoice-checks";
 
@@ -61,15 +61,7 @@ function adminView(inv: AdminInvoice) {
   return {
     ...inv,
     user: { name: userFullName(inv.user) },
-    approval: approvalDecision(
-      ex
-        ? ({
-            status: ex.status,
-            checks_version: ex.checks_version,
-            review_flags: ex.review_flags,
-          } as unknown as ExtractionForApproval)
-        : null
-    ),
+    approval: approvalDecision(ex),
   };
 }
 
@@ -104,13 +96,6 @@ export async function GET(
   return NextResponse.json({ data: shopView(data) });
 }
 
-/** Thrown inside the PATCH transaction to roll it back and answer 409. */
-class EditConflict extends Error {
-  constructor(readonly body: { error: string; code: string }) {
-    super(body.error);
-  }
-}
-
 const STALE_EDIT = {
   error: "This invoice is extracting or changed since you opened it. Reload and try again.",
   code: "stale",
@@ -119,9 +104,6 @@ const APPROVED_EDIT = {
   error: "Approved invoices can't be edited. Unapprove it first.",
   code: "approved",
 };
-
-const isTransactionTimeout = (err: unknown) =>
-  typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2028";
 
 /** A stored Decimal (or a number from the request) as dollars, or null. */
 function dollars(v: unknown): number | null {
@@ -198,7 +180,7 @@ export async function PATCH(
 
         // Extraction row first, then the invoice: the approve route's lock order.
         if (stored) {
-          if (stored.status === "processing") throw new EditConflict(STALE_EDIT);
+          if (stored.status === "processing") throw new TransactionConflict(STALE_EDIT);
 
           // KTD9: any edit, amount-only included, starts a new run so an open
           // review goes stale and any confirmation is void. Value warnings
@@ -242,7 +224,7 @@ export async function PATCH(
               updated_at: now,
             },
           });
-          if (updated.count === 0) throw new EditConflict(STALE_EDIT);
+          if (updated.count === 0) throw new TransactionConflict(STALE_EDIT);
         } else if (editsExtraction) {
           // No run yet: the admin fills the values in by hand. checks_version
           // stays null, so approving it needs a confirmation. Skip-duplicates
@@ -265,7 +247,7 @@ export async function PATCH(
             },
             skipDuplicates: true,
           });
-          if (created.count === 0) throw new EditConflict(STALE_EDIT);
+          if (created.count === 0) throw new TransactionConflict(STALE_EDIT);
         }
 
         if (amount !== undefined) {
@@ -273,11 +255,11 @@ export async function PATCH(
             where: { id, status: { not: "approved" } },
             data: { amount, updated_at: now },
           });
-          if (updated.count === 0) throw new EditConflict(APPROVED_EDIT);
+          if (updated.count === 0) throw new TransactionConflict(APPROVED_EDIT);
         }
       });
     } catch (err) {
-      if (err instanceof EditConflict) {
+      if (err instanceof TransactionConflict) {
         return NextResponse.json(err.body, { status: 409 });
       }
       if (isTransactionTimeout(err)) {

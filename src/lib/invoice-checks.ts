@@ -12,6 +12,8 @@
 //
 // Money is compared in integer cents with a ±2¢ tolerance per comparison.
 
+import { formatCurrency } from "./utils";
+
 /** Bump when the checks change, so older runs count as "unchecked". */
 export const CHECKS_VERSION = 1;
 
@@ -156,8 +158,7 @@ const centsOrNull = (n: number | null | undefined): number | null =>
 
 const withinTolerance = (a: number, b: number) => Math.abs(a - b) <= MONEY_TOLERANCE_CENTS;
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const formatCents = (cents: number) => usd.format(cents / 100);
+const formatCents = (cents: number) => formatCurrency(cents / 100);
 
 // ---------------------------------------------------------------------------
 // Value checks (arithmetic, missing total, typed amount)
@@ -374,10 +375,15 @@ export function recomputeValueFlags(
 // Approval decision (KTD4, KTD6)
 // ---------------------------------------------------------------------------
 
+/** Approval reasons that describe the run's state rather than a stored flag. */
+export const APPROVAL_STATE_REASONS = ["no_extraction", "processing", "failed", "unchecked"] as const;
+export type ApprovalStateReason = (typeof APPROVAL_STATE_REASONS)[number];
+
+/** The stored row as read from the database; `review_flags` is untrusted JSON. */
 export interface ExtractionForApproval {
   status: "processing" | "completed" | "failed";
   checks_version: number | null;
-  review_flags: ReviewFlag[];
+  review_flags: unknown;
 }
 
 export interface ApprovalDecision {
@@ -385,10 +391,7 @@ export interface ApprovalDecision {
   approvable: boolean;
   /** True when approval needs the admin's confirmation that they checked the original. */
   confirmationRequired: boolean;
-  /**
-   * Why: "no_extraction" | "processing" | "failed" | "unchecked", or the
-   * distinct stored flag codes. Empty when clean.
-   */
+  /** Why: an `ApprovalStateReason`, or the distinct stored flag codes. Empty when clean. */
   reasons: string[];
 }
 
@@ -404,6 +407,8 @@ export function approvalDecision(extraction: ExtractionForApproval | null): Appr
   if (extraction.checks_version !== CHECKS_VERSION || !Array.isArray(extraction.review_flags)) {
     return { approvable: true, confirmationRequired: true, reasons: ["unchecked"] };
   }
-  const reasons = [...new Set(extraction.review_flags.map((f) => String(f?.code)))];
+  const reasons = [
+    ...new Set((extraction.review_flags as Array<{ code?: unknown } | null>).map((f) => String(f?.code))),
+  ];
   return { approvable: true, confirmationRequired: reasons.length > 0, reasons };
 }
