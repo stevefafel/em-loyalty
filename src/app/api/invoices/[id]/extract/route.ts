@@ -132,15 +132,17 @@ export async function POST(
     });
     if (count === 0) return alreadyRunning();
   } else {
-    // One conditional write, measured by the database clock. Clears the review
-    // state of the previous run; its line items stay until this run succeeds.
+    // One conditional write, measured by the database clock. Voids the previous
+    // run's checks marker and confirmation. Its values, line items and
+    // review_flags stay until this run succeeds (the success write replaces
+    // them together), so a run that fails still shows the prior warnings beside
+    // the prior values; a non-completed row needs confirmation regardless.
     // Shop callers (allowRerun false) can only take over a stale processing row.
     const allowRerun = isAdmin;
     const claimed = await prisma.$executeRaw`
       UPDATE invoice_extractions
          SET run_id = ${token}::uuid,
              status = 'processing',
-             review_flags = '[]'::jsonb,
              checks_version = NULL,
              content_sha256 = NULL,
              confirmed_run_id = NULL,
@@ -186,6 +188,17 @@ export async function POST(
     console.error("Invoice extraction failed", { invoiceId: id, code });
     return (await recordFailure(code)) ? respond("failed") : superseded();
   };
+
+  // The typed amount for the review flags is read again now that the claim
+  // holds: an amount edit that committed after the first read would otherwise
+  // leave this run's amount_mismatch computed from a stale amount. From here
+  // on, PATCH refuses to change the amount while the run is processing.
+  const current = await prisma.invoice.findUnique({
+    where: { id },
+    select: { amount: true },
+  });
+  if (!current) return fail("extraction_failed");
+  const typedAmount = Number(current.amount);
 
   // --- File (KTD10) ---------------------------------------------------------
   if (!isValidInvoiceFilePath(invoice.shop_id, invoice.file_path)) {
@@ -241,7 +254,7 @@ export async function POST(
     aiSubtotal: result.subtotal,
     aiTax: result.tax_amount,
     lineItemAmounts: result.line_items.map((item) => item.amount),
-    typedAmount: Number(invoice.amount),
+    typedAmount,
     fileType,
     scan,
     modelReport: result.instructions_detected,

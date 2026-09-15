@@ -411,7 +411,7 @@ describe("POST /api/invoices/[id]/extract — admins", () => {
     expect(download).toHaveBeenCalledWith("s9/invoice.pdf");
   });
 
-  it("re-runs a completed pending invoice: resets review state, rotates run_id, returns the full extraction", async () => {
+  it("re-runs a completed pending invoice: voids checks and confirmation, keeps prior flags, rotates run_id, returns the full extraction", async () => {
     findInvoice.mockResolvedValue(invoice({ extraction: { ...EXISTING } }));
     const full = {
       id: "e1",
@@ -429,7 +429,8 @@ describe("POST /api/invoices/[id]/extract — admins", () => {
 
     const { sql, values } = claimCall();
     expect(sql).toMatch(/status = 'processing'/);
-    expect(sql).toMatch(/review_flags = '\[\]'/);
+    // The prior run's warnings stay beside its values until this run succeeds.
+    expect(sql).not.toMatch(/review_flags/);
     expect(sql).toMatch(/checks_version = NULL/);
     expect(sql).toMatch(/content_sha256 = NULL/);
     expect(sql).toMatch(/confirmed_run_id = NULL/);
@@ -488,6 +489,112 @@ describe("POST /api/invoices/[id]/extract — admins", () => {
     expect((await POST(postReq(), ctx())).status).toBe(409);
     expect(download).not.toHaveBeenCalled();
     expect(extractInvoiceData).not.toHaveBeenCalled();
+  });
+
+  it("keeps the previous run's warnings when a re-run of a flagged extraction fails", async () => {
+    const priorFlags: ReviewFlag[] = [
+      { code: "amount_mismatch", detail: "Typed amount $500.00 differs from the AI total $108.00" },
+      { code: "model_reported_instructions", detail: "The model reported instructions in the document" },
+    ];
+    // The stored row before the re-run: completed, flagged, with its values.
+    const prior = {
+      id: "e1",
+      status: "completed",
+      run_id: EXISTING.run_id,
+      approved_run_id: null,
+      total_amount: 108,
+      review_flags: priorFlags,
+      error_message: null,
+    };
+    findInvoice.mockResolvedValue(invoice({ extraction: { ...EXISTING } }));
+    extractInvoiceData.mockRejectedValue(new InvoiceExtractionError("provider_error"));
+    const { POST } = await loadRoute();
+    const res = await POST(postReq(), ctx());
+
+    expect(res.status).toBe(200);
+    // The claim leaves review_flags alone...
+    expect(claimCall().sql).not.toMatch(/review_flags/);
+    // ...the failure write touches only status, the code and the timestamp...
+    const write = failureWrite();
+    expect(write.where).toMatchObject({ id: "e1", run_id: claimedToken(), status: "processing" });
+    expect(Object.keys(write.data).sort()).toEqual(["error_message", "status", "updated_at"]);
+    // ...and no success write replaces them.
+    expect(transaction).not.toHaveBeenCalled();
+    expect(txUpdateManyExtraction).not.toHaveBeenCalled();
+
+    // Applying the failure write to the prior row: failed, prior warnings intact.
+    const after = { ...prior, ...write.data };
+    expect(after).toMatchObject({ status: "failed", error_message: "provider_error", total_amount: 108 });
+    expect(after.review_flags).toEqual(priorFlags);
+  });
+});
+
+describe("POST /api/invoices/[id]/extract — typed amount", () => {
+  beforeEach(() => getSession.mockResolvedValue(ADMIN_SESSION));
+
+  it.each([
+    ["an edit to 500.00 lands before the claim", "108.00", "500.00", true],
+    ["an edit to 108.00 lands before the claim", "500.00", "108.00", false],
+  ])(
+    "computes amount_mismatch from the amount read after the claim (%s)",
+    async (_label, before, after, mismatch) => {
+      findInvoice
+        .mockResolvedValueOnce(invoice({ amount: before, extraction: { ...EXISTING } }))
+        .mockResolvedValueOnce({ amount: after });
+      const { POST } = await loadRoute();
+      await POST(postReq(), ctx());
+
+      // The second read is the amount alone, and it follows the claim.
+      expect(findInvoice).toHaveBeenCalledTimes(2);
+      expect(findInvoice.mock.calls[1][0]).toEqual({ where: { id: "i1" }, select: { amount: true } });
+      expect(findInvoice.mock.invocationCallOrder[1]).toBeGreaterThan(
+        executeRaw.mock.invocationCallOrder[0]
+      );
+      const flags = successWrite().data.review_flags;
+      if (mismatch) expect(codes(flags)).toContain("amount_mismatch");
+      else expect(codes(flags)).not.toContain("amount_mismatch");
+    }
+  );
+
+  it("fails the run under its token when the invoice is gone after the claim", async () => {
+    findInvoice
+      .mockResolvedValueOnce(invoice({ extraction: { ...EXISTING } }))
+      .mockResolvedValueOnce(null);
+    const { POST } = await loadRoute();
+    const res = await POST(postReq(), ctx());
+
+    expect(res.status).toBe(200);
+    expect(download).not.toHaveBeenCalled();
+    expect(extractInvoiceData).not.toHaveBeenCalled();
+    const write = failureWrite();
+    expect(write.where).toMatchObject({ id: "e1", run_id: claimedToken(), status: "processing" });
+    expect(write.data).toMatchObject({ status: "failed", error_message: "extraction_failed" });
+  });
+});
+
+describe("POST /api/invoices/[id]/extract — invoice date", () => {
+  beforeEach(() => getSession.mockResolvedValue(SHOP_SESSION));
+
+  it("stores a printed YYYY-MM-DD date as that UTC day", async () => {
+    const { POST } = await loadRoute();
+    await POST(postReq(), ctx());
+
+    expect(successWrite().data.invoice_date).toEqual(new Date("2026-09-01T00:00:00.000Z"));
+  });
+
+  it.each([
+    ["a non-ISO format", "09/01/2026"],
+    ["an impossible calendar date", "2026-02-30"],
+    ["no date", null],
+  ])("stores a null invoice_date for %s", async (_label, invoice_date) => {
+    extractInvoiceData.mockResolvedValue({ ...structuredClone(AI_RESULT), invoice_date });
+    const { POST } = await loadRoute();
+    const res = await POST(postReq(), ctx());
+
+    expect(res.status).toBe(200);
+    const write = successWrite();
+    expect(write.data.status).toBe("completed");
+    expect(write.data.invoice_date).toBeNull();
   });
 });
 
