@@ -109,6 +109,7 @@ model User {
   training_logs   TrainingLog[]
   collateral_logs CollateralLog[]
   sessions        Session[]
+  confirmed_extractions InvoiceExtraction[] @relation("ExtractionConfirmer")
 
   @@index([role])
   @@map("users")
@@ -189,8 +190,23 @@ model InvoiceExtraction {
   created_at     DateTime         @default(now()) @db.Timestamptz()
   updated_at     DateTime         @default(now()) @db.Timestamptz()
 
+  // Review gate (ExxonMobil VA finding 79513). run_id identifies one extraction
+  // run: it rotates on every claim, admin edit and unapprove, and an approval
+  // must name the run the admin reviewed. checks_version null = the row predates
+  // the independent checks (or was created by an admin edit) and counts as
+  // unchecked. review_flags holds the stored warnings the gate reads.
+  run_id           String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  checks_version   Int?
+  review_flags     Json      @default("[]")
+  content_sha256   String?
+  approved_run_id  String?   @db.Uuid
+  confirmed_run_id String?   @db.Uuid
+  confirmed_at     DateTime? @db.Timestamptz()
+  confirmed_by     String?   @db.Uuid
+
   invoice    Invoice           @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
   line_items InvoiceLineItem[]
+  confirmer  User?             @relation("ExtractionConfirmer", fields: [confirmed_by], references: [id], onDelete: SetNull)
 
   @@map("invoice_extractions")
 }
