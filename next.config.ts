@@ -27,9 +27,14 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // Authenticated JSON must never be cached by a browser or proxy. A config
       // header overrides one the route sets itself, so /api/training/<id>/...
-      // (SCORM content and CDN assets, which set their own caching) is excluded.
+      // (SCORM content and CDN assets, which set their own caching) is excluded
+      // — except /complete, which sets none and gets no-store explicitly.
       {
         source: "/api/:path((?!training/[^/]+/).*)",
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
+      },
+      {
+        source: "/api/training/:id/complete",
         headers: [{ key: "Cache-Control", value: "private, no-store" }],
       },
     ];

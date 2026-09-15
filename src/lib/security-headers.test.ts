@@ -43,7 +43,14 @@ describe("security headers (next.config)", () => {
   });
 
   it("marks API responses no-store so authenticated JSON is never cached", async () => {
-    for (const path of ["/api/users", "/api/invoices/abc/extract", "/api/training", "/api/training/abc"]) {
+    for (const path of [
+      "/api/users",
+      "/api/invoices/abc/extract",
+      "/api/training",
+      "/api/training/abc",
+      // Under the excluded training prefix but sets no caching of its own.
+      "/api/training/abc/complete",
+    ]) {
       expect(await configCacheControlFor(path), path).toBe("private, no-store");
     }
   });
