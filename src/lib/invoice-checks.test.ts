@@ -171,6 +171,25 @@ describe("computeValueFlags — line items against the subtotal", () => {
       )
     ).toEqual(["line_items_mismatch"]);
   });
+
+  it("passes line items that include the tax line and add up to the total", () => {
+    // $700 of work + a $50 tax line against subtotal $700, tax $50, total $750.
+    expect(
+      computeValueFlags(
+        baseInput({ lineItemAmounts: [700, 50], aiSubtotal: 700, aiTax: 50, aiTotal: 750, typedAmount: 750 })
+      )
+    ).toEqual([]);
+  });
+
+  it("still flags items that match neither the subtotal nor the total", () => {
+    expect(
+      codes(
+        computeValueFlags(
+          baseInput({ lineItemAmounts: [694.67], aiSubtotal: 1379.5, aiTax: 0, aiTotal: 10000, typedAmount: 10000 })
+        )
+      )
+    ).toEqual(["line_items_mismatch", "subtotal_tax_total_mismatch"]);
+  });
 });
 
 describe("computeValueFlags — subtotal plus tax against the total", () => {

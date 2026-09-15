@@ -193,6 +193,8 @@ export function computeValueFlags(input: ValueCheckInput): ReviewFlag[] {
   const known = items.filter((c): c is number => c !== null);
 
   // Line items against the subtotal (or, without a subtotal, total minus tax).
+  // Items that add up to the total also pass: many invoices list tax and fees
+  // as line items (tuned on the stored invoices, 2026-09-15).
   if (known.length === 0) {
     flags.push({
       code: "line_items_missing",
@@ -206,7 +208,8 @@ export function computeValueFlags(input: ValueCheckInput): ReviewFlag[] {
   } else {
     const sum = known.reduce((a, b) => a + b, 0);
     const target = subtotal ?? (total !== null ? total - tax : null);
-    if (target !== null && !withinTolerance(sum, target)) {
+    const matchesTotal = total !== null && withinTolerance(sum, total);
+    if (target !== null && !withinTolerance(sum, target) && !matchesTotal) {
       flags.push({
         code: "line_items_mismatch",
         detail:
