@@ -8,15 +8,21 @@ import { invoiceExtractionResponseSchema } from "@/lib/validators/invoice-extrac
 // The SDK client is mocked; `openai/helpers/zod` and `openai/error` are
 // separate specifiers and stay real, so the response_format under test is the
 // one the SDK would actually send.
-const { parse, filesCreate } = vi.hoisted(() => ({
+const { parse, filesCreate, clientOptions } = vi.hoisted(() => ({
   parse: vi.fn(),
   filesCreate: vi.fn(),
+  // Every options object the module constructs the client with. Not reset
+  // between tests: the module caches a single client.
+  clientOptions: [] as Record<string, unknown>[],
 }));
 
 vi.mock("openai", () => ({
   default: class {
     chat = { completions: { parse } };
     files = { create: filesCreate };
+    constructor(options: Record<string, unknown>) {
+      clientOptions.push(options);
+    }
   },
   toFile: vi.fn(),
 }));
@@ -196,6 +202,26 @@ describe("extractInvoiceData — request shape", () => {
       required: ["found", "excerpts"],
       additionalProperties: false,
     });
+  });
+
+  // The extract route has a 60 s maxDuration; the SDK default (10 minutes per
+  // attempt, 2 retries) would let a hung call outlive it.
+  it("bounds each attempt and the retries on the client", async () => {
+    await extractInvoiceData(PDF, "application/pdf");
+
+    expect(clientOptions).toHaveLength(1);
+    expect(clientOptions[0]).toMatchObject({ timeout: 40_000, maxRetries: 1 });
+  });
+
+  it("passes an abort signal that caps the whole call, retries included", async () => {
+    await extractInvoiceData(PDF, "application/pdf");
+
+    expect(parse).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    const { signal } = parse.mock.calls[0][1] as { signal: AbortSignal };
+    expect(signal.aborted).toBe(false);
   });
 
   it("builds the response format from the zod v4 schema", () => {

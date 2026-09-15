@@ -15,7 +15,10 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     invoice: { findUnique: (...a: unknown[]) => findInvoice(...a) },
     $transaction: (fn: (tx: unknown) => unknown) => {
-      transaction();
+      // A test can make the whole transaction fail (e.g. a P2028 timeout) by
+      // having `transaction` return a rejected promise.
+      const failure = transaction();
+      if (failure) return failure;
       return fn({
         invoiceExtraction: {
           findUnique: (...a: unknown[]) => findExtraction(...a),
@@ -480,6 +483,20 @@ describe("PATCH /api/invoices/[id]", () => {
     expect(createManyExtraction).not.toHaveBeenCalled();
     expect(updateManyExtraction).not.toHaveBeenCalled();
     expect(updateManyInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 503 when the transaction times out", async () => {
+    transaction.mockRejectedValue(
+      Object.assign(new Error("Transaction already closed"), { code: "P2028" })
+    );
+    const { PATCH } = await loadRoute();
+    const res = await PATCH(patchReq({ amount: 150, extraction: { total_amount: 150 } }), ctx());
+
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/busy/i);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(updateManyExtraction).not.toHaveBeenCalled();
+    expect(updateManyInvoice).not.toHaveBeenCalled();
   });
 
   it("still returns 400 with field errors for an invalid body", async () => {
