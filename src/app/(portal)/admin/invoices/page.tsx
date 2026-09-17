@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +32,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDateUTC } from "@/lib/utils";
 import { getSignedInvoiceUrl } from "@/lib/supabase/storage";
-import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2, Trash2, Pencil, Save } from "lucide-react";
-import type { InvoiceExtraction } from "@/types/database";
+import { Eye, CheckCircle, XCircle, Undo2, Bot, AlertTriangle, Loader2, Trash2, Pencil, Save, RefreshCw } from "lucide-react";
+import type { ApprovalDecision } from "@/lib/invoice-checks";
+import {
+  ReviewWarnings,
+  hasExtractedValues,
+  normalizeFlags,
+  type ReviewExtraction,
+} from "./review-warnings";
+
+/** How often the review modal re-reads an extraction that is still running. */
+const POLL_INTERVAL_MS = 3000;
+
+/** GET/PATCH /api/invoices/:id for an admin. Only the fields this page reads. */
+interface InvoiceDetail {
+  id: string;
+  amount: number | string;
+  status: string;
+  extraction: ReviewExtraction | null;
+  approval?: ApprovalDecision;
+}
+
+async function loadInvoices(): Promise<InvoiceWithRelations[]> {
+  const res = await fetch("/api/invoices");
+  const { data } = await res.json();
+  return data || [];
+}
+
+/** The admin detail for one invoice, or null when it couldn't be read. */
+async function fetchInvoiceDetail(invoiceId: string): Promise<InvoiceDetail | null> {
+  try {
+    const res = await fetch(`/api/invoices/${invoiceId}`);
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    return body?.data ?? null;
+  } catch {
+    return null;
+  }
+}
 
 interface EditForm {
   amount: string;
@@ -74,8 +110,19 @@ export default function AdminInvoicesPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [actionLoading, setActionLoading] = useState<"approve" | "reject" | null>(null);
-  const [extractionData, setExtractionData] = useState<InvoiceExtraction | null>(null);
+  const [extractionData, setExtractionData] = useState<ReviewExtraction | null>(null);
   const [extractionLoading, setExtractionLoading] = useState(false);
+  // The server's approval decision for the displayed run. Never derived here.
+  const [approval, setApproval] = useState<ApprovalDecision | null>(null);
+  // The "I reviewed the original" confirmation, keyed to the run it was given
+  // for: it counts only while that run is still the one displayed, so a
+  // refetch, re-run or edit (each a new run_id) clears it.
+  const [confirmation, setConfirmation] = useState<{ runId: string; checked: boolean } | null>(null);
+  const [rerunning, setRerunning] = useState(false);
+  // Inline error for approve, re-run and edit refusals shown above the footer.
+  const [reviewError, setReviewError] = useState("");
+  // The invoice the open modal shows. Late responses for any other are dropped.
+  const activeReviewId = useRef<string | null>(null);
 
   // Manual-override edit state for the AI-extracted panel.
   const [editing, setEditing] = useState(false);
@@ -89,47 +136,159 @@ export default function AdminInvoicesPage() {
   const [deleteError, setDeleteError] = useState("");
 
   const fetchInvoices = useCallback(async () => {
-    const res = await fetch("/api/invoices");
-    const { data } = await res.json();
-    setInvoices(data || []);
+    setInvoices(await loadInvoices());
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    if (isAdmin) fetchInvoices();
-  }, [isAdmin, fetchInvoices]);
+    if (!isAdmin) return;
+    let cancelled = false;
+    loadInvoices().then((data) => {
+      if (cancelled) return;
+      setInvoices(data);
+      setIsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  /** Shows a fetched detail, if its invoice is still the one under review. */
+  const applyDetail = useCallback((invoiceId: string, detail: InvoiceDetail) => {
+    if (activeReviewId.current !== invoiceId) return;
+    setExtractionData(detail.extraction ?? null);
+    setApproval(detail.approval ?? null);
+    setReviewTarget((prev) =>
+      prev && prev.id === invoiceId
+        ? { ...prev, amount: Number(detail.amount), status: detail.status }
+        : prev
+    );
+  }, []);
+
+  const refreshDetail = useCallback(
+    async (invoiceId: string) => {
+      const detail = await fetchInvoiceDetail(invoiceId);
+      if (detail) applyDetail(invoiceId, detail);
+    },
+    [applyDetail]
+  );
+
+  // While the run is still extracting, re-read it every few seconds. Stops as
+  // soon as it finishes, the modal closes or the page unmounts.
+  const reviewId = reviewTarget?.id ?? null;
+  const extractionProcessing = extractionData?.status === "processing";
+  useEffect(() => {
+    if (!reviewId || !extractionProcessing || rerunning) return;
+    let cancelled = false;
+    let inFlight = false;
+    const timer = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
+      const detail = await fetchInvoiceDetail(reviewId);
+      inFlight = false;
+      if (!cancelled && detail) applyDetail(reviewId, detail);
+    }, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [reviewId, extractionProcessing, rerunning, applyDetail]);
 
   const openReview = async (inv: InvoiceWithRelations) => {
+    activeReviewId.current = inv.id;
     setReviewTarget(inv);
     setPreviewUrl(null);
     setExtractionData(null);
+    setApproval(null);
+    setConfirmation(null);
+    setReviewError("");
+    setRerunning(false);
     setLoadingPreview(true);
     setExtractionLoading(true);
 
-    const [signedUrl, detailRes] = await Promise.all([
+    const [signedUrl, detail] = await Promise.all([
       getSignedInvoiceUrl(inv.file_path),
-      fetch(`/api/invoices/${inv.id}`),
+      fetchInvoiceDetail(inv.id),
     ]);
+    if (activeReviewId.current !== inv.id) return;
 
     setPreviewUrl(signedUrl.url || null);
     setLoadingPreview(false);
 
-    if (detailRes.ok) {
-      const { data } = await detailRes.json();
-      setExtractionData(data.extraction || null);
-    }
+    if (detail) applyDetail(inv.id, detail);
     setExtractionLoading(false);
   };
 
   const closeReview = () => {
+    activeReviewId.current = null;
     setReviewTarget(null);
     setPreviewUrl(null);
     setActionLoading(null);
     setExtractionData(null);
+    setApproval(null);
+    setConfirmation(null);
+    setReviewError("");
+    setRerunning(false);
     setEditing(false);
     setEditForm(null);
     setEditError("");
   };
+
+  // --- Review gate, from the displayed run and the server's decision --------
+  const displayedRunId = extractionData?.run_id ?? null;
+  const confirmed =
+    displayedRunId !== null &&
+    confirmation?.runId === displayedRunId &&
+    confirmation.checked;
+  const invoiceApproved =
+    reviewTarget?.status === "approved" || !!extractionData?.approved_run_id;
+  const showConfirmation =
+    !!approval?.approvable &&
+    approval.confirmationRequired &&
+    displayedRunId !== null &&
+    !invoiceApproved &&
+    !rerunning &&
+    !editing &&
+    !extractionLoading;
+  const canEdit =
+    !editing &&
+    !extractionLoading &&
+    !rerunning &&
+    extractionData?.status !== "processing" &&
+    !invoiceApproved;
+  // Any pending invoice that isn't approved can be (re-)extracted (KTD7).
+  const canRerun =
+    reviewTarget?.status === "pending" &&
+    !invoiceApproved &&
+    !editing &&
+    !extractionLoading;
+
+  let approveBlockedReason: string | null = null;
+  if (reviewTarget && !extractionLoading) {
+    if (invoiceApproved) {
+      approveBlockedReason = "This invoice is already approved.";
+    } else if (rerunning) {
+      approveBlockedReason = "Wait for the extraction to finish.";
+    } else if (editing) {
+      approveBlockedReason = "Save or cancel your edits before approving.";
+    } else if (!approval) {
+      approveBlockedReason =
+        "The review details didn't load, so this invoice can't be approved. Close and reopen the review.";
+    } else if (approval.reasons.includes("processing")) {
+      approveBlockedReason =
+        "Extraction is still running. Approve becomes available when it finishes.";
+    } else if (approval.reasons.includes("no_extraction") || displayedRunId === null) {
+      approveBlockedReason =
+        "This invoice has no extraction yet. Run extraction before approving.";
+    } else if (!approval.approvable) {
+      approveBlockedReason = "This invoice can't be approved yet.";
+    } else if (approval.confirmationRequired && !confirmed) {
+      approveBlockedReason =
+        "Confirm you reviewed the original document to enable Approve.";
+    }
+  }
+  const approveDisabled =
+    !!actionLoading || extractionLoading || approveBlockedReason !== null;
 
   const startEdit = () => {
     setEditError("");
@@ -188,47 +347,122 @@ export default function AdminInvoicesPage() {
     };
     if (!isNaN(amountNum) && amountNum > 0) body.amount = amountNum;
 
-    const res = await fetch(`/api/invoices/${reviewTarget.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const invoiceId = reviewTarget.id;
+    let res: Response;
+    try {
+      res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      setSavingEdit(false);
+      setEditError("Could not save changes. Check your connection and try again.");
+      return;
+    }
     const data = await res.json().catch(() => null);
     setSavingEdit(false);
+    if (activeReviewId.current !== invoiceId) return;
 
     if (!res.ok) {
-      setEditError(
+      const message =
         typeof data?.error === "string"
           ? data.error
-          : "Could not save changes. Please check the values."
-      );
+          : "Could not save changes. Please check the values.";
+      if (res.status === 409 && data?.code === "approved") {
+        // Approved values are final; leave edit mode and show why.
+        setEditing(false);
+        setEditForm(null);
+        setEditError("");
+        setReviewError(message);
+        fetchInvoices();
+      } else {
+        setEditError(message);
+      }
+      // The run changed or the invoice was approved: show its current state.
+      if (res.status === 409) await refreshDetail(invoiceId);
       return;
     }
 
-    if (data?.data) {
-      setExtractionData(data.data.extraction || null);
-      setReviewTarget((prev) =>
-        prev ? { ...prev, amount: Number(data.data.amount) } : prev
-      );
-    }
+    // The edit started a new run (new run_id), which clears any confirmation.
+    if (data?.data) applyDetail(invoiceId, data.data as InvoiceDetail);
+    setReviewError("");
     setEditing(false);
     setEditForm(null);
     fetchInvoices();
   };
 
-  const handleApprove = async () => {
+  const rerunExtraction = async () => {
     if (!reviewTarget) return;
-    setActionLoading("approve");
+    const invoiceId = reviewTarget.id;
+    setRerunning(true);
+    setReviewError("");
+    setConfirmation(null);
 
-    const res = await fetch(`/api/invoices/${reviewTarget.id}/approve`, {
-      method: "POST",
-    });
+    // Synchronous on the server (up to ~60s); the panel shows a running state.
+    let message = "";
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/extract`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        message =
+          typeof data?.error === "string"
+            ? data.error
+            : `Extraction could not be run (${res.status}).`;
+      }
+    } catch {
+      message = "Extraction request failed. Check your connection and try again.";
+    }
+    if (activeReviewId.current !== invoiceId) return;
+
+    await refreshDetail(invoiceId);
+    if (activeReviewId.current !== invoiceId) return;
+    setRerunning(false);
+    if (message) setReviewError(message);
+  };
+
+  const handleApprove = async () => {
+    if (!reviewTarget || !extractionData) return;
+    const invoiceId = reviewTarget.id;
+    const runId = extractionData.run_id;
+    setActionLoading("approve");
+    setReviewError("");
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/invoices/${invoiceId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          confirmed ? { runId, confirmReviewed: true } : { runId }
+        ),
+      });
+    } catch {
+      setReviewError("Approval failed. Check your connection and try again.");
+      setActionLoading(null);
+      return;
+    }
 
     if (res.ok) {
-      closeReview();
+      if (activeReviewId.current === invoiceId) closeReview();
       fetchInvoices();
+      return;
     }
-    setActionLoading(null);
+
+    const data = await res.json().catch(() => null);
+    if (activeReviewId.current !== invoiceId) return;
+    setReviewError(
+      typeof data?.error === "string"
+        ? data.error
+        : `Approval failed (${res.status}). Please try again.`
+    );
+    // Any 409 means what's displayed is out of date: refetch. A new run_id
+    // clears the confirmation, so the admin re-confirms for what they now see.
+    if (res.status === 409) {
+      await refreshDetail(invoiceId);
+      if (data?.code === "already_approved") fetchInvoices();
+    }
+    if (activeReviewId.current === invoiceId) setActionLoading(null);
   };
 
   const handleReject = async () => {
@@ -555,19 +789,17 @@ export default function AdminInvoicesPage() {
                   <Bot className="h-4 w-4" />
                   AI-Extracted Data
                 </h3>
-                {!editing &&
-                  !extractionLoading &&
-                  extractionData?.status !== "processing" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2"
-                      onClick={startEdit}
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      Edit
-                    </Button>
-                  )}
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={startEdit}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    Edit
+                  </Button>
+                )}
               </div>
               {editing && editForm ? (
                 <div className="space-y-3 text-sm">
@@ -676,153 +908,216 @@ export default function AdminInvoicesPage() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading...
                 </div>
-              ) : !extractionData ? (
-                <p className="text-sm text-muted-foreground">
-                  No extraction data available.
-                </p>
-              ) : extractionData.status === "processing" ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Processing...
-                </div>
-              ) : extractionData.status === "failed" ? (
-                <div className="text-sm text-red-500 space-y-2">
-                  <div className="flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    Extraction failed
+              ) : rerunning ? (
+                <div className="rounded-md border p-2 text-sm">
+                  <div className="flex items-center gap-2 font-medium text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Running extraction...
                   </div>
-                  {extractionData.error_message && (
-                    <p className="text-xs text-muted-foreground">
-                      {extractionData.error_message}
-                    </p>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      if (!reviewTarget) return;
-                      setExtractionLoading(true);
-                      setExtractionData(null);
-                      await fetch(`/api/invoices/${reviewTarget.id}/extract`, { method: "POST" });
-                      const detailRes = await fetch(`/api/invoices/${reviewTarget.id}`);
-                      if (detailRes.ok) {
-                        const { data } = await detailRes.json();
-                        setExtractionData(data.extraction || null);
-                      }
-                      setExtractionLoading(false);
-                    }}
-                  >
-                    Retry Extraction
-                  </Button>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    The AI is reading the document and the checks are running.
+                    This can take up to a minute.
+                  </p>
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Vendor:</span>{" "}
-                      {extractionData.vendor_name || "N/A"}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Invoice #:</span>{" "}
-                      {extractionData.invoice_number || "N/A"}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Date:</span>{" "}
-                      {extractionData.invoice_date
-                        ? formatDateUTC(extractionData.invoice_date)
-                        : "N/A"}
-                    </div>
-                  </div>
+                  {/* Warnings panel: stored warnings + the server's decision */}
+                  <ReviewWarnings extraction={extractionData} approval={approval} />
 
-                  <Separator />
+                  {extractionData &&
+                    extractionData.status !== "processing" &&
+                    (extractionData.status === "completed" ||
+                      hasExtractedValues(extractionData)) && (
+                    <>
+                      <Separator />
 
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Subtotal:</span>{" "}
-                      {extractionData.subtotal != null
-                        ? formatCurrency(extractionData.subtotal)
-                        : "N/A"}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Tax:</span>{" "}
-                      {extractionData.tax_amount != null
-                        ? formatCurrency(extractionData.tax_amount)
-                        : "N/A"}
-                    </div>
-                    <div className="font-medium">
-                      <span className="text-muted-foreground">Total:</span>{" "}
-                      {extractionData.total_amount != null
-                        ? formatCurrency(extractionData.total_amount)
-                        : "N/A"}
-                    </div>
-                  </div>
-
-                  {/* Amount comparison */}
-                  {reviewTarget && extractionData.total_amount != null && (
-                    <div className="p-2 rounded bg-muted text-sm space-y-1">
-                      <div>
-                        <span className="text-muted-foreground">User submitted:</span>{" "}
-                        {formatCurrency(Number(reviewTarget.amount))}
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">AI extracted:</span>{" "}
-                        {formatCurrency(extractionData.total_amount)}
-                      </div>
-                      {Math.abs(
-                        Number(reviewTarget.amount) - extractionData.total_amount
-                      ) > 0.01 && (
-                        <Badge
-                          variant="outline"
-                          className="border-yellow-500 text-yellow-700 mt-1"
-                        >
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Amount Mismatch
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Line items */}
-                  {extractionData.line_items &&
-                    extractionData.line_items.length > 0 && (
-                      <>
-                        <Separator />
+                      <div className="space-y-2 text-sm">
                         <div>
-                          <h4 className="font-medium text-sm mb-2">
-                            Line Items ({extractionData.line_items.length})
-                          </h4>
-                          <div className="space-y-2">
-                            {extractionData.line_items.map((item) => (
-                              <div
-                                key={item.id}
-                                className="text-xs border rounded p-2 space-y-1"
-                              >
-                                <div className="font-medium">
-                                  {item.description}
-                                </div>
-                                <div className="flex justify-between text-muted-foreground">
-                                  <span>
-                                    {item.quantity != null
-                                      ? `Qty: ${item.quantity}`
-                                      : ""}
-                                    {item.quantity != null &&
-                                      item.unit_price != null &&
-                                      ` x ${formatCurrency(item.unit_price)}`}
-                                  </span>
-                                  <span className="font-medium text-foreground">
-                                    {formatCurrency(item.amount)}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                          <span className="text-muted-foreground">Vendor:</span>{" "}
+                          <bdi>{extractionData.vendor_name || "N/A"}</bdi>
                         </div>
-                      </>
-                    )}
+                        <div>
+                          <span className="text-muted-foreground">Invoice #:</span>{" "}
+                          <bdi>{extractionData.invoice_number || "N/A"}</bdi>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Date:</span>{" "}
+                          {extractionData.invoice_date
+                            ? formatDateUTC(extractionData.invoice_date)
+                            : "N/A"}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Subtotal:</span>{" "}
+                          {extractionData.subtotal != null
+                            ? formatCurrency(extractionData.subtotal)
+                            : "N/A"}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Tax:</span>{" "}
+                          {extractionData.tax_amount != null
+                            ? formatCurrency(extractionData.tax_amount)
+                            : "N/A"}
+                        </div>
+                        <div className="font-medium">
+                          <span className="text-muted-foreground">Total:</span>{" "}
+                          {extractionData.total_amount != null
+                            ? formatCurrency(extractionData.total_amount)
+                            : "N/A"}
+                        </div>
+                      </div>
+
+                      {/* Amount comparison. A missing AI total can't confirm the
+                          typed amount, so it still counts as a mismatch. */}
+                      {reviewTarget && (
+                        <div className="p-2 rounded bg-muted text-sm space-y-1">
+                          <div>
+                            <span className="text-muted-foreground">User submitted:</span>{" "}
+                            {formatCurrency(Number(reviewTarget.amount))}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">AI extracted:</span>{" "}
+                            {extractionData.total_amount != null
+                              ? formatCurrency(Number(extractionData.total_amount))
+                              : "Not found"}
+                          </div>
+                          {(extractionData.total_amount == null ||
+                            Math.abs(
+                              Number(reviewTarget.amount) -
+                                Number(extractionData.total_amount)
+                            ) > 0.01 ||
+                            normalizeFlags(extractionData.review_flags).some(
+                              (f) => f.code === "amount_mismatch"
+                            )) && (
+                            <Badge
+                              variant="outline"
+                              className="border-yellow-500 text-yellow-700 mt-1"
+                            >
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Amount Mismatch
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Line items */}
+                      {extractionData.line_items &&
+                        extractionData.line_items.length > 0 && (
+                          <>
+                            <Separator />
+                            <div>
+                              <h4 className="font-medium text-sm mb-2">
+                                Line Items ({extractionData.line_items.length})
+                              </h4>
+                              <div className="space-y-2">
+                                {extractionData.line_items.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="text-xs border rounded p-2 space-y-1"
+                                  >
+                                    <div className="font-medium">
+                                      <bdi>{item.description}</bdi>
+                                    </div>
+                                    <div className="flex justify-between text-muted-foreground">
+                                      <span>
+                                        {item.quantity != null
+                                          ? `Qty: ${item.quantity}`
+                                          : ""}
+                                        {item.quantity != null &&
+                                          item.unit_price != null &&
+                                          ` x ${formatCurrency(item.unit_price)}`}
+                                      </span>
+                                      <span className="font-medium text-foreground">
+                                        {formatCurrency(item.amount)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                    </>
+                  )}
                 </>
+              )}
+
+              {canRerun && (
+                <div className="space-y-1">
+                  <Separator />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full mt-3"
+                    onClick={rerunExtraction}
+                    disabled={rerunning || !!actionLoading || savingEdit}
+                  >
+                    {rerunning ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {rerunning
+                      ? "Running extraction..."
+                      : extractionData
+                        ? "Re-run extraction"
+                        : "Run extraction"}
+                  </Button>
+                  {extractionData && !rerunning && (
+                    <p className="text-xs text-muted-foreground">
+                      Reads the document again and replaces the values and
+                      warnings shown above, including any edits.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
+
+          {/* Confirmation, why Approve is off, and inline refusals */}
+          {reviewTarget &&
+            (showConfirmation || approveBlockedReason || reviewError) && (
+              <div className="space-y-2 border-t pt-3">
+                {showConfirmation && displayedRunId && (
+                  <label
+                    htmlFor="confirm-reviewed"
+                    className="flex items-start gap-3 text-sm leading-relaxed"
+                  >
+                    <input
+                      id="confirm-reviewed"
+                      type="checkbox"
+                      checked={confirmed}
+                      disabled={!!actionLoading}
+                      onChange={(e) =>
+                        setConfirmation({
+                          runId: displayedRunId,
+                          checked: e.target.checked,
+                        })
+                      }
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-exxon-red"
+                    />
+                    <span>
+                      I reviewed the original document and it supports this
+                      amount ({formatCurrency(Number(reviewTarget.amount))})
+                    </span>
+                  </label>
+                )}
+                {approveBlockedReason && (
+                  <p className="text-xs text-muted-foreground">
+                    {approveBlockedReason}
+                  </p>
+                )}
+                {reviewError && (
+                  <p className="text-sm text-red-500" role="alert">
+                    {reviewError}
+                  </p>
+                )}
+              </div>
+            )}
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
               variant="outline"
@@ -841,7 +1136,7 @@ export default function AdminInvoicesPage() {
             </Button>
             <Button
               onClick={handleApprove}
-              disabled={!!actionLoading}
+              disabled={approveDisabled}
               className="bg-green-600 text-white hover:bg-green-700"
             >
               <CheckCircle className="h-4 w-4 mr-1" />

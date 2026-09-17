@@ -113,4 +113,44 @@ describe("POST /api/invoices", () => {
     expect(updateShop).toHaveBeenCalledTimes(1);
     expect(updateShop.mock.calls[0][0].where.id).toBe("s1");
   });
+
+  // KTD10: the shop check alone isn't enough — an admin's filePath must also
+  // point inside the shop folder being filed to, or storage URL resolution
+  // could be steered at another shop's file.
+  describe("filePath scoping (KTD10)", () => {
+    it("refuses a filePath under another shop's folder and creates no invoice", async () => {
+      getSession.mockResolvedValue(ADMIN_SESSION);
+      const { POST } = await loadRoute();
+      const res = await POST(
+        postReq({ shopId: "s1", amount: 2501, filePath: "s2/invoice.pdf" })
+      );
+
+      expect(res.status).toBe(400);
+      expect(createInvoice).not.toHaveBeenCalled();
+    });
+
+    it("refuses a %2e%2e encoded traversal filePath", async () => {
+      getSession.mockResolvedValue(SHOP_SESSION);
+      const { POST } = await loadRoute();
+      const res = await POST(
+        postReq({
+          shopId: "s1",
+          amount: 2501,
+          filePath: "s1/%2e%2e/s2/invoice.pdf",
+        })
+      );
+
+      expect(res.status).toBe(400);
+      expect(createInvoice).not.toHaveBeenCalled();
+    });
+
+    it("still succeeds with a valid own-shop filePath", async () => {
+      getSession.mockResolvedValue(SHOP_SESSION);
+      const { POST } = await loadRoute();
+      const res = await POST(postReq(OWN));
+
+      expect(res.status).toBe(200);
+      expect(createInvoice).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -26,10 +26,21 @@ export async function POST(
     );
   }
 
-  await prisma.invoice.update({
-    where: { id },
+  // Conditional on still being pending: an approval that commits between the
+  // read above and this write must not be overwritten. Rejecting an approved
+  // invoice would leave its extraction locked (approved_run_id set) with no
+  // route able to approve, edit, re-extract or unapprove it again.
+  const updated = await prisma.invoice.updateMany({
+    where: { id, status: "pending" },
     data: { status: "rejected", updated_at: new Date() },
   });
+
+  if (updated.count === 0) {
+    return NextResponse.json(
+      { error: "Invoice is no longer pending. Refresh and try again." },
+      { status: 409 }
+    );
+  }
 
   return NextResponse.json({
     data: { invoiceId: id, status: "rejected" },

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { userFullName } from "@/lib/utils";
 import { MIN_INITIAL_INVOICE } from "@/lib/constants";
 import { canAccessShop, shopFilterFor } from "@/lib/shop-scope";
+import { isValidInvoiceFilePath } from "@/lib/invoice-file-path";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -67,6 +68,15 @@ export async function POST(req: NextRequest) {
   // redirect out of the portal for every one of its users.
   if (!canAccessShop(session, shopId)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // KTD10: filePath must point inside the shop folder it's being filed to,
+  // or storage URL resolution could be steered at another shop's file.
+  if (!isValidInvoiceFilePath(shopId, filePath)) {
+    return NextResponse.json(
+      { error: "Invalid invoice file path" },
+      { status: 400 }
+    );
   }
 
   if (isInitial && amount < MIN_INITIAL_INVOICE) {
